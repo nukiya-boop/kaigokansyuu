@@ -303,22 +303,29 @@
   });
 
   // 研修資料
-  route(/^\/m\/(\d\d)$/, function (key) {
-    var m = BY_KEY[key];
-    var body = m.blocks.map(function (b) {
+  function materialBody(m) {
+    return m.blocks.map(function (b) {
       if (b.type === 'h') return '<h3>' + esc(b.text) + '</h3>';
       if (b.type === 'p') return '<p>' + esc(b.text) + '</p>';
       return '<div class="table-wrap"><table>' + (b.head ? '<tr>' + b.head.map(function (c) { return '<th>' + esc(c) + '</th>'; }).join('') + '</tr>' : '') +
         b.rows.map(function (r) { return '<tr>' + r.map(function (c) { return '<td>' + esc(c) + '</td>'; }).join('') + '</tr>'; }).join('') + '</table></div>';
     }).join('');
+  }
+  function refsList(refs) {
+    return '<ul>' + refs.map(function (r) {
+      return '<li>' + (r.url ? '<a href="' + esc(r.url) + '" target="_blank" rel="noopener">' + esc(r.name) + '</a>' : esc(r.name)) + '<span class="muted small">（' + esc(r.org) + '）' + esc(r.use) + '</span></li>';
+    }).join('') + '</ul>';
+  }
+
+  route(/^\/m\/(\d\d)$/, function (key) {
+    var m = BY_KEY[key];
+    var body = materialBody(m);
     var review = m.review.length ? '<h2>振り返りクイズ（研修中の確認用・記録されません）</h2>' + m.review.map(function (r, i) {
       return '<div class="q" id="rv' + i + '"><div class="qt">' + (i + 1) + '. ' + esc(r.q) + '</div><div class="opts">' +
         ['○', '×'].map(function (o) { return '<button class="opt ox" data-rv="' + i + '" data-v="' + o + '">' + o + '</button>'; }).join('') +
         '</div><div class="explain" hidden></div></div>';
     }).join('') : '';
-    var refs = m.refs.length ? '<h2>参考資料（公的機関）</h2><ul>' + m.refs.map(function (r) {
-      return '<li>' + (r.url ? '<a href="' + esc(r.url) + '" target="_blank" rel="noopener">' + esc(r.name) + '</a>' : esc(r.name)) + '<span class="muted small">（' + esc(r.org) + '）' + esc(r.use) + '</span></li>';
-    }).join('') + '</ul>' : '';
+    var refs = m.refs.length ? '<h2>参考資料（公的機関）</h2>' + refsList(m.refs) : '';
     later(function () {
       Array.prototype.forEach.call(document.querySelectorAll('[data-rv]'), function (b) {
         b.onclick = function () {
@@ -334,7 +341,149 @@
       '<div class="material card"><h1>' + esc(m.title) + legalBadge(m) + '</h1>' +
       '<p class="muted">講師：' + esc(m.instructor) + '　区分：' + esc(m.category) + '</p>' +
       (m.aim ? '<div class="aim"><b>ねらい：</b>' + esc(m.aim) + '</div>' : '') + body + review + refs +
-      '<div class="actions"><a class="btn" href="#/test/' + key + '">確認テストを受ける</a><a class="btn sub" href="#/print/test/' + key + '">問題用紙を印刷</a><a class="btn sub" href="#/record/' + key + '">実施記録</a></div></div>';
+      '<div class="actions"><a class="btn" href="#/test/' + key + '">確認テストを受ける</a><a class="btn sub" href="#/print/material/' + key + '">研修資料を印刷</a><a class="btn sub" href="#/print/test/' + key + '">問題用紙を印刷</a><a class="btn sub" href="#/record/' + key + '">実施記録</a></div></div>';
+  });
+
+  // ---------- 資料集（Excelの資料） ----------
+  route(/^\/library$/, function () {
+    return '<h1>資料集</h1><p class="muted">Excel「研修計画・研修資料・記録様式」と「研修確認テスト集」に入っている資料です。</p>' +
+      '<h2>研修資料（4月〜3月）</h2><div class="table-wrap"><table><tr><th>月</th><th>研修テーマ</th><th>区分</th><th>講師</th><th></th></tr>' +
+      MONTHS.map(function (m) {
+        return '<tr><td>' + esc(m.month) + '</td><td>' + esc(m.theme) + legalBadge(m) + '</td><td>' + esc(m.category) + '</td><td>' + esc(m.instructor) + '</td>' +
+          '<td style="white-space:nowrap"><a href="#/m/' + m.key + '">読む</a>　<a href="#/print/material/' + m.key + '">印刷</a></td></tr>';
+      }).join('') + '</table></div>' +
+      '<div class="actions"><a class="btn sub" href="#/print/materials">研修資料12か月分をまとめて印刷</a></div>' +
+      '<h2>計画・参考資料・様式</h2><div class="grid">' +
+      printLink('#/library/plan', '年間研修計画', '月別のテーマ・区分・主な内容・講師、委員会・訓練の年間計画') +
+      printLink('#/library/refs', '参考資料（公的資料リンク）', '研修テーマ別の厚生労働省などの資料') +
+      printLink('#/print/blank', '記録様式（白紙）', '様式1〜5を白紙で印刷（手書きで記録する場合）') +
+      printLink('#/library/rules', '記入のルール・テストの使い方', '記録を書くときの決まり、確認テストの使い方') +
+      '</div>' +
+      '<h2>確認テスト集</h2><div class="grid">' +
+      printLink('#/print/tests', '問題用紙（12か月分）', '解答なし。紙で実施する場合・欠席者への配布用') +
+      printLink('#/print/answers', '解答・解説（管理者・講師用）', '全12回分の正解と解説') +
+      '<a class="card month-card" href="docs/' + encodeURIComponent('確認テスト_解答一覧') + '.xlsx" download><b>解答Excel（採点表つき）</b><div class="muted small">正解一覧・解答解説・振り返りクイズ解答・自動採点表</div></a>' +
+      '</div>';
+  });
+
+  route(/^\/library\/plan$/, function () {
+    return '<div class="actions"><a class="btn sub" href="#/library">← 資料集へ</a><a class="btn sub" href="#/print/plan">実施状況つきで印刷</a></div>' +
+      '<h1>' + reiwa(S.settings.startYear) + '　年間研修計画</h1><p class="muted">★は法定研修（運営基準で年1回以上の実施が義務）。</p>' +
+      '<div class="table-wrap"><table><tr><th>月</th><th>研修テーマ</th><th>区分</th><th>主な内容</th><th>講師</th></tr>' +
+      MONTHS.map(function (m) {
+        return '<tr><td>' + esc(m.month) + '</td><td><a href="#/m/' + m.key + '">' + (m.legal ? '★' : '') + esc(m.theme) + '</a></td><td>' + esc(m.category) + '</td><td>' + esc(m.content) + '</td><td>' + esc(m.instructor) + '</td></tr>';
+      }).join('') + '</table></div>' +
+      '<h2>委員会・訓練の年間計画</h2><div class="table-wrap"><table><tr><th>項目</th><th>頻度の基準</th><th>実施予定月</th><th>担当</th><th>記録</th></tr>' +
+      D.committees.map(function (c) {
+        return '<tr><td>' + esc(c.item) + '</td><td>' + esc(c.freq) + '</td><td>' + esc(c.months) + '</td><td>' + esc(c.owner) + '</td><td>' + esc(c.record) + '</td></tr>';
+      }).join('') + '</table></div>';
+  });
+
+  route(/^\/library\/refs$/, function () {
+    return '<div class="actions"><a class="btn sub" href="#/library">← 資料集へ</a></div><h1>参考資料（公的機関の資料）</h1>' +
+      '<p class="muted">研修資料の根拠や、より詳しく説明したいときに使ってください。リンク先はExcel作成時（2026年10月21日）に確認したものです。</p>' +
+      MONTHS.filter(function (m) { return m.refs.length; }).map(function (m) {
+        return '<h3>' + esc(m.month) + '　' + (m.legal ? '★' : '') + esc(m.theme) + '</h3>' + refsList(m.refs);
+      }).join('');
+  });
+
+  route(/^\/library\/rules$/, function () {
+    return '<div class="actions"><a class="btn sub" href="#/library">← 資料集へ</a></div><h1>記入のルール・テストの使い方</h1>' +
+      '<div class="card"><h3>記入のルール</h3><ul>' +
+      '<li>日付・参加者・時間は、実際に行った内容をそのまま記入します。</li>' +
+      '<li>計画月と実施月がずれた場合は、備考欄に理由を書きます（例：計画5月、10月に実施）。</li>' +
+      '<li>後日まとめて記録を作成した場合は、実施日とは別に「記録作成日」を記入します。</li>' +
+      '<li>欠席者は資料を読んで確認テストを提出してもらい、様式2の回覧確認表に日付と署名を残します。</li>' +
+      '<li>複数のテーマを同じ日に行う場合は、テーマごとに様式1を作成します。</li>' +
+      '</ul></div>' +
+      '<div class="card"><h3>確認テストの使い方</h3><ul>' +
+      '<li>全10問（○×5問、三択5問）、1問1点の10点満点です。目安は' + S.settings.passMark + '点以上で、それより低い職員には解説を使って個別に説明します。</li>' +
+      '<li>採点後、点数を様式2（参加者名簿）の「確認テスト点数」欄に記録します（アプリで受験した場合は自動で入ります）。</li>' +
+      '<li>欠席者にも資料とあわせて配布し、提出日を様式2の回覧確認表に記録します。</li>' +
+      '<li>研修資料の末尾にある5問の振り返りクイズは研修中の振り返り用、確認テストは理解度確認・記録用として使い分けます。</li>' +
+      '</ul></div>';
+  });
+
+  function paperMaterial(key, withAnswers) {
+    var m = BY_KEY[key];
+    return '<div class="paper material"><h1>' + esc(m.title) + '</h1>' +
+      (m.aim ? '<p><b>ねらい：</b>' + esc(m.aim) + '</p>' : '') + materialBody(m) +
+      (m.review.length ? '<h3>確認テスト（○か×で答えてください）</h3>' + m.review.map(function (r, i) {
+        return '<p>' + (i + 1) + '. ' + esc(r.q) + (withAnswers ? '　<b>【' + r.a + '】</b>' + (r.note ? esc('（' + r.note + '）') : '') : '　（　　）') + '</p>';
+      }).join('') : '') +
+      (m.refs.length ? '<h3>参考資料（公的機関）</h3>' + m.refs.map(function (r) { return '<p class="small">・' + esc(r.name) + '（' + esc(r.org) + '）</p>'; }).join('') : '') + '</div>';
+  }
+  function materialToggle(href, ans) {
+    return '<div class="actions"><a class="btn sub" href="' + href + '">' + (ans ? '解答なしで印刷（配布用）' : '解答つきで印刷（講師用）') + '</a></div>';
+  }
+  route(/^\/print\/material\/(\d\d)(\/ans)?$/, function (key, ans) {
+    return paperShell('研修資料', materialToggle('#/print/material/' + key + (ans ? '' : '/ans'), !!ans) + paperMaterial(key, !!ans));
+  });
+  route(/^\/print\/materials(\/ans)?$/, function (ans) {
+    return paperShell('研修資料（12か月分）', materialToggle('#/print/materials' + (ans ? '' : '/ans'), !!ans) + MONTHS.map(function (m) { return paperMaterial(m.key, !!ans); }).join(''));
+  });
+
+  route(/^\/print\/blank$/, function () {
+    var rows = function (n, cols) { var h = ''; for (var i = 1; i <= n; i++) h += '<tr class="sign"><td class="c">' + i + '</td>' + new Array(cols).join('<td></td>') + '</tr>'; return h; };
+    var f1 = '<div class="paper"><h1>様式1　研修実施記録</h1><p>事業所名：</p><table>' +
+      trow('研修名', '') + trow('区分', box(['法定研修（虐待防止・感染症・BCP）', '事業所研修', '新規採用時研修'], [])) +
+      trow('実施日時', '令和　年　月　日（　）　　時　　分 〜 　　時　　分（　　分間）') + trow('実施場所・方法', box(PLACES, [])) +
+      trow('講師', '氏名：　　　　　　　　職名：') + trow('参加者数', '　　名（様式2 参加者名簿のとおり）／対象者　　名') +
+      trow('使用資料', '□ 研修資料（　　月）　□ 確認テスト　□ その他：') + trow('研修内容の要旨', '<div style="height:5em"></div>') +
+      trow('質疑・意見交換の内容', '<div style="height:4em"></div>') + trow('理解度確認の結果', '確認テスト平均　　点／満点　　点、要フォロー者　　名') +
+      trow('欠席者への対応', '□ 資料回覧＋確認テスト　□ 伝達研修（　月　日）　□ その他：') + trow('今後の課題・次回への反映', '<div style="height:3em"></div>') +
+      trow('備考（計画との差異など）', '<div style="height:2em"></div>') + trow('記録作成日・記録者', '令和　年　月　日　　記録者：') + trow('管理者確認', '確認日：　　　　　　　署名：') + '</table></div>';
+    var f2 = '<div class="paper"><h1>様式2　参加者名簿・欠席者回覧確認表</h1><table>' + trow('研修名', '') + trow('実施日', '令和　年　月　日') + '</table>' +
+      '<h3>参加者名簿（当日参加者は本人署名）</h3><table class="list"><tr><th class="c">No.</th><th>氏名</th><th>職種・雇用形態</th><th style="width:28%">署名</th><th class="c">確認テスト点数</th></tr>' + rows(15, 5) + '</table>' +
+      '<h3>欠席者 資料回覧確認表（資料を読み、確認テストを提出した日に署名）</h3><table class="list"><tr><th class="c">No.</th><th>氏名</th><th>資料受領日</th><th>確認テスト提出日</th><th class="c">点数</th><th>本人署名</th><th>管理者確認</th></tr>' + rows(8, 7) + '</table></div>';
+    return paperShell('記録様式（白紙）', f1 + f2 + paperCommittee({}) + paperDrill({ types: [] }) + paperNewHire({ id: '', name: '' }));
+  });
+
+  // ---------- 説明書 ----------
+  function md(text) {
+    var out = [], lines = text.split('\n'), i = 0, n = 0;
+    var inline = function (s) { return esc(s); };
+    while (i < lines.length) {
+      var l = lines[i];
+      if (!l.trim()) { i++; continue; }
+      var h = l.match(/^(#{2,3}) (.*)$/);
+      if (h) {
+        if (h[1] === '##') { n++; out.push('<h2 id="sec' + n + '">' + inline(h[2]) + '</h2>'); } else out.push('<h3>' + inline(h[2]) + '</h3>');
+        i++; continue;
+      }
+      if (/^\|/.test(l)) {
+        var rows = [];
+        while (i < lines.length && /^\|/.test(lines[i])) { rows.push(lines[i]); i++; }
+        var cells = function (r) { return r.replace(/^\||\|$/g, '').split('|').map(function (c) { return c.trim(); }); };
+        out.push('<div class="table-wrap"><table><tr>' + cells(rows[0]).map(function (c) { return '<th>' + inline(c) + '</th>'; }).join('') + '</tr>' +
+          rows.slice(2).map(function (r) { return '<tr>' + cells(r).map(function (c) { return '<td>' + inline(c) + '</td>'; }).join('') + '</tr>'; }).join('') + '</table></div>');
+        continue;
+      }
+      var lm = l.match(/^(\d+\.|-) /);
+      if (lm) {
+        var ordered = lm[1] !== '-', items = [];
+        while (i < lines.length && /^(\d+\.|-) /.test(lines[i])) { items.push(lines[i].replace(/^(\d+\.|-) /, '')); i++; }
+        var tag = ordered ? 'ol' : 'ul';
+        out.push('<' + tag + '>' + items.map(function (t) { return '<li>' + inline(t) + '</li>'; }).join('') + '</' + tag + '>');
+        continue;
+      }
+      out.push('<p>' + inline(l) + '</p>'); i++;
+    }
+    return out.join('');
+  }
+  route(/^\/manual$/, function () {
+    var text = window.MANUAL_TEXT || '';
+    var heads = text.split('\n').filter(function (l) { return /^## /.test(l); }).map(function (l) { return l.slice(3); });
+    later(function () {
+      Array.prototype.forEach.call(document.querySelectorAll('[data-sec]'), function (a) {
+        a.onclick = function (e) { e.preventDefault(); document.getElementById('sec' + a.dataset.sec).scrollIntoView({ behavior: 'smooth' }); };
+      });
+      document.getElementById('mprint').onclick = function () { window.print(); };
+    });
+    return '<div class="actions"><button id="mprint" class="sub">説明書を印刷・PDF保存</button></div>' +
+      '<div class="material card manual"><h1>訪問介護 研修アプリ 説明書</h1>' +
+      '<div class="notice no-print"><b>目次</b><ol>' + heads.map(function (t, i) { return '<li><a href="#" data-sec="' + (i + 1) + '">' + esc(t) + '</a></li>'; }).join('') + '</ol></div>' +
+      md(text) + '</div>';
   });
 
   // 確認テスト
