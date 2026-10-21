@@ -130,3 +130,7 @@ td.c, th.c { text-align: center; }
 table.grade select { width: auto; min-width: 3.2em; padding: .3rem; font-size: 1.05rem; }
 table.grade select.ans-ok { background: var(--ok-soft); border-color: #9fd0a6; }
 table.grade select.ans-ng { background: var(--warn-soft); border-color: #efc9ae; }
+tr.row-ok td { background: var(--ok-soft); }
+tr.row-ng td { background: var(--warn-soft); }
+details.card summary { cursor: pointer; }
+@media print { tr.row-ok td, tr.row-ng td { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }

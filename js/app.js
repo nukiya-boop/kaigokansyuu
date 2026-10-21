@@ -536,7 +536,8 @@
         var score = qs.filter(function (q, i) { return T.answers[i] === q.answer; }).length;
         T.step = 'result'; T.score = score;
         if (T.kind !== '練習') {
-          S.results.push({ id: uid(), staffId: T.staffId, month: key, kind: T.kind, score: score, answers: T.answers.slice(), startedAt: T.startedAt, takenAt: nowISO() });
+          T.resultId = uid();
+          S.results.push({ id: T.resultId, staffId: T.staffId, month: key, kind: T.kind, score: score, answers: T.answers.slice(), startedAt: T.startedAt, takenAt: nowISO() });
           if (T.kind === '回覧') {
             var ss = session(key);
             ss.attendees[T.staffId] = ss.attendees[T.staffId] || '欠席';
@@ -557,7 +558,7 @@
       res = '<div class="card" style="text-align:center"><div>' + esc(staffName(T.staffId)) + 'さんの結果</div><div class="score">' + T.score + ' / 10点</div>' +
         '<div>' + (pass ? '<span class="badge ok">合格ライン到達</span>' : '<span class="badge warn">もう一度資料を確認しましょう（管理者・講師から個別に説明します）</span>') + '</div>' +
         '<p class="muted small">' + (T.kind === '練習' ? '練習のため記録されていません。' : '受験日時：' + waDateTime(nowISO()) + '　記録しました。') + '</p>' +
-        '<div class="actions" style="justify-content:center"><button class="sub" id="again">別の職員が受ける</button><a class="btn sub" href="#/m/' + key + '">研修資料を見直す</a></div></div>';
+        '<div class="actions" style="justify-content:center"><button class="sub" id="again">別の職員が受ける</button>' + (T.resultId && T.kind !== '練習' ? '<a class="btn sub" href="#/result/' + T.resultId + '">結果と解説を印刷</a>' : '') + '<a class="btn sub" href="#/m/' + key + '">研修資料を見直す</a></div></div>';
       later(function () { document.getElementById('again').onclick = function () { T = null; render(); }; });
     }
     return head + '<p>氏名：<b>' + esc(staffName(T.staffId)) + '</b>　種類：' + esc(T.kind) + '</p>' + res +
@@ -599,16 +600,21 @@
       });
       f.onsubmit = function (e) {
         e.preventDefault();
-        var d = formData(f), saved = [], partial = [];
+        var d = formData(f), todo = [], partial = [];
         list.forEach(function (s) {
           var ans = qs.map(function (q, i) { return d['a_' + s.id + '_' + i] || ''; });
           var n = ans.filter(Boolean).length;
           if (!n) return;
-          if (n < qs.length) { partial.push(s.name); return; }
+          if (n < qs.length) partial.push(s.name); else todo.push({ s: s, ans: ans });
+        });
+        if (!todo.length) { alert('10問すべて入力した職員がいません。'); return; }
+        if (partial.length && !confirm('未回答の問がある職員は保存されません（' + partial.join('、') + '）。ほかの職員を保存しますか？')) return;
+        var date = d.date || today(), ids = [], saved = [];
+        todo.forEach(function (x) {
+          var s = x.s, ans = x.ans, kind = d['k_' + s.id];
           var score = qs.filter(function (q, i) { return ans[i] === q.answer; }).length;
-          var kind = d['k_' + s.id];
-          var date = d.date || today();
-          S.results.push({ id: uid(), staffId: s.id, month: key, kind: kind, score: score, answers: ans, source: '紙', startedAt: '', takenAt: date + 'T' + nowISO().slice(11) });
+          var r = { id: uid(), staffId: s.id, month: key, kind: kind, score: score, answers: ans, source: '紙', startedAt: '', takenAt: date + 'T' + nowISO().slice(11) };
+          S.results.push(r); ids.push(r.id);
           var se = session(key);
           if (!se.attendees[s.id]) se.attendees[s.id] = kind === '回覧' ? '欠席' : '参加';
           if (kind === '回覧') {
@@ -617,17 +623,15 @@
           }
           saved.push(s.name + ' ' + score + '点');
         });
-        if (partial.length && !confirm('未回答の問がある職員は保存されません（' + partial.join('、') + '）。ほかの職員を保存しますか？')) return;
-        if (!saved.length) { alert('10問すべて入力した職員がいません。'); return; }
         save('紙の確認テストを採点：' + m.month + ' ' + saved.join('、'));
-        alert('採点して記録しました。\n' + saved.join('\n'));
-        go('/record/' + key);
+        toast('採点して記録しました');
+        go('/result/' + ids.join(','));
       };
     });
     var rows = list.map(function (s) {
       var rs = officialResults(s.id, key);
       if (rs.length) {
-        return '<tr><td>' + esc(s.name) + '</td><td colspan="' + (qs.length + 2) + '" class="muted small">採点済み：' + rs[0].score + '点（' + esc(waDateTime(rs[0].takenAt)) + '、' + esc(rs[0].source === '紙' ? '紙' : 'アプリ') + '）</td></tr>';
+        return '<tr><td>' + esc(s.name) + '</td><td colspan="' + (qs.length + 2) + '" class="muted small">採点済み：' + rs[0].score + '点（' + esc(waDateTime(rs[0].takenAt)) + '、' + esc(rs[0].source === '紙' ? '紙' : 'アプリ') + '）　<a href="#/result/' + rs[0].id + '">解説を見る</a></td></tr>';
       }
       var a = attendance(s.id, key);
       return '<tr data-sid="' + s.id + '"><td>' + esc(s.name) + '</td>' +
@@ -641,7 +645,36 @@
       '<div class="notice">提出された解答用紙の答えを入れると、その場で自動採点されます（緑：正解、赤：不正解）。「採点して記録する」を押すと点数が記録され、様式2の確認テスト点数に入ります。</div>' +
       '<form id="grade"><div class="row"><div><label>提出日</label><input type="date" name="date" value="' + today() + '"></div></div>' +
       '<div class="table-wrap"><table class="grade"><tr><th>氏名</th><th>種類</th>' + qs.map(function (q) { return '<th class="c">問' + q.no + '</th>'; }).join('') + '<th class="c">点数</th></tr>' + rows + '</table></div>' +
-      '<div class="actions"><button type="submit">採点して記録する</button></div></form>';
+      '<div class="actions"><button type="submit">採点して記録する</button></div></form>' +
+      '<details class="card"><summary><b>この月の正解と解説を見る</b></summary>' + answerTable(m) + '</details>';
+  });
+
+  function answerTable(m, answers) {
+    return '<div class="table-wrap"><table class="list"><tr><th class="c">問</th><th>問題</th>' + (answers ? '<th class="c">解答</th>' : '') + '<th class="c">正解</th>' + (answers ? '<th class="c">結果</th>' : '') + '<th>解説</th></tr>' +
+      m.test.map(function (q, i) {
+        var a = answers && answers[i], ok = a === q.answer;
+        var qt = esc(q.q) + (q.choices.length ? '<br><span class="small">' + q.choices.map(function (c) { return c.k + '　' + esc(c.t); }).join('<br>') + '</span>' : '');
+        return '<tr' + (answers ? ' class="' + (ok ? 'row-ok' : 'row-ng') + '"' : '') + '><td class="c">' + q.no + '</td><td>' + qt + '</td>' +
+          (answers ? '<td class="c">' + esc(a || '') + '</td>' : '') + '<td class="c"><b>' + esc(q.answer) + '</b></td>' +
+          (answers ? '<td class="c">' + (ok ? '○' : '×') + '</td>' : '') + '<td>' + esc(q.explain) + '</td></tr>';
+      }).join('') + '</table></div>';
+  }
+
+  // 採点結果と解説（職員への返却・個別フォロー用）
+  route(/^\/result\/([\w,]+)$/, function (ids) {
+    var rs = ids.split(',').map(function (id) { return S.results.filter(function (r) { return r.id === id; })[0]; }).filter(Boolean);
+    if (!rs.length) return '<p>記録が見つかりません。</p>';
+    return paperShell('採点結果と解説（職員に返却・個別フォロー用）', rs.map(function (r) {
+      var m = BY_KEY[r.month], pass = r.score >= S.settings.passMark;
+      var wrong = m.test.filter(function (q, i) { return r.answers[i] !== q.answer; }).map(function (q) { return '問' + q.no; });
+      return '<div class="paper"><h1>確認テスト 採点結果と解説</h1>' +
+        '<table><tr><th>研修</th><td>' + esc(m.month + '　' + m.theme) + '</td></tr><tr><th>氏名</th><td>' + esc(staffName(r.staffId)) + '</td></tr>' +
+        '<tr><th>提出日</th><td>' + esc(wa(r.takenAt)) + '（' + esc(r.source || 'アプリ') + '・' + esc(r.kind === '回覧' ? '欠席（資料回覧）' : '研修参加') + '）</td></tr>' +
+        '<tr><th>点数</th><td><b style="font-size:1.3em">' + r.score + '点</b> ／ 10点　' + (pass ? '<span class="badge ok">合格</span>' : '<span class="badge warn">要フォロー（解説を使って個別に説明）</span>') + '</td></tr>' +
+        '<tr><th>間違えた問題</th><td>' + (wrong.length ? esc(wrong.join('、')) : 'なし（全問正解）') + '</td></tr></table>' +
+        '<h3>解答と解説</h3>' + answerTable(m, r.answers) +
+        (pass ? '' : '<table><tr><th>個別フォローの実施日・説明者</th><td style="height:2.4em"></td></tr></table>') + '</div>';
+    }).join(''));
   });
 
   // 研修実施記録一覧
@@ -696,7 +729,7 @@
     var rows = list.map(function (s) {
       var a = attendance(s.id, key), ab = ss.absentees[s.id] || {}, sc = scoreOf(s.id, key);
       var rs = officialResults(s.id, key);
-      var paper = rs.length ? '<span>' + rs[0].score + '点</span><span class="muted small">（' + esc(rs[0].source || 'アプリ') + '）</span>' + (rs.length > 1 ? '<span class="muted small">（再受験' + (rs.length - 1) + '回）</span>' : '') :
+      var paper = rs.length ? '<a href="#/result/' + rs[0].id + '" title="解答と解説">' + rs[0].score + '点</a><span class="muted small">（' + esc(rs[0].source || 'アプリ') + '）</span>' + (rs.length > 1 ? '<span class="muted small">（再受験' + (rs.length - 1) + '回）</span>' : '') :
         '<input type="number" min="0" max="10" name="paper_' + s.id + '" value="' + esc(ss.paperScores[s.id] !== undefined ? ss.paperScores[s.id] : '') + '" placeholder="紙" style="width:4.5em">';
       return '<tr><td>' + esc(s.name) + '<div class="muted small">' + esc(s.job || '') + ' ' + esc(s.employment || '') + '</div></td>' +
         '<td><select name="att_' + s.id + '"><option value="">未記録</option>' + opt(['参加', '欠席', '対象外'], ss.attendees[s.id] || '') + '</select>' + (!ss.attendees[s.id] && a ? '<div class="muted small">テストより：' + a + '</div>' : '') + '</td>' +
