@@ -1399,8 +1399,8 @@
               S = load(); save('バックアップから復元（置き換え）');
             } else {
               var n = mergeIn(x);
-              save('データを取り込み：職員追加' + n.staff + '名・更新' + n.updated + '名、テスト' + n.results + '件');
-              alert('取り込みました。職員 追加' + n.staff + '名・更新' + n.updated + '名、確認テスト ' + n.results + '件、委員会・訓練 ' + n.meetings + '件。');
+              save('データを取り込み：職員追加' + n.staff + '名・更新' + n.updated + '名、テスト' + n.results + '件' + (n.removed ? '、差し替えで削除' + n.removed + '件' : ''));
+              alert('取り込みました。職員 追加' + n.staff + '名・更新' + n.updated + '名、確認テスト ' + n.results + '件' + (n.removed ? '（差し替えで古い結果' + n.removed + '件を削除）' : '') + '、委員会・訓練 ' + n.meetings + '件。');
             }
             render();
           } catch (err) { alert('読み込めませんでした：' + err.message); }
@@ -1450,6 +1450,12 @@
       }
       S.staff.push(s); idMap[s.id] = s.id; n.staff++;
     });
+    // 解答用紙の差し替え：取り込みファイルで指定された古いテスト結果を消す
+    var drop = {};
+    (x.removeResults || []).forEach(function (id) { drop[id] = 1; });
+    var before = S.results.length;
+    S.results = S.results.filter(function (r) { return !drop[r.id]; });
+    n.removed = before - S.results.length;
     var have = {};
     S.results.forEach(function (r) { have[r.id] = 1; });
     (x.results || []).forEach(function (r) {
