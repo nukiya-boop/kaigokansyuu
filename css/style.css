@@ -134,3 +134,4 @@ tr.row-ok td { background: var(--ok-soft); }
 tr.row-ng td { background: var(--warn-soft); }
 details.card summary { cursor: pointer; }
 @media print { tr.row-ok td, tr.row-ng td { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+.fy-select { width: auto; background: #fff; color: var(--ink); border: 0; border-radius: 6px; padding: .2rem .4rem; font-size: .9rem; }

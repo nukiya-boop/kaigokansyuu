@@ -33,8 +33,8 @@
   // ---------- 保存データ ----------
   function defaultState() {
     return {
-      version: 1,
-      settings: { office: '', startYear: 2026, manager: '', abuseOfficer: '', infectionOfficer: '', passMark: 7 },
+      version: 2,
+      settings: { office: '', startYear: 2026, openDate: '', manager: '', abuseOfficer: '', infectionOfficer: '', passMark: 7 },
       staff: [],
       sessions: {},
       results: [],
@@ -54,10 +54,19 @@
         var d = defaultState();
         Object.keys(d).forEach(function (k) { if (s[k] === undefined) s[k] = d[k]; });
         Object.keys(d.settings).forEach(function (k) { if (s.settings[k] === undefined) s.settings[k] = d.settings[k]; });
-        return s;
+        return migrate(s, s.settings.startYear);
       }
     } catch (e) { console.error(e); }
     return defaultState();
+  }
+  // 版1のデータ（研修記録が月だけで管理されていた）を年度つきに直す
+  function migrate(x, fy) {
+    var sessions = {};
+    Object.keys(x.sessions || {}).forEach(function (k) { sessions[/^\d\d$/.test(k) ? fy + '-' + k : k] = x.sessions[k]; });
+    x.sessions = sessions;
+    (x.results || []).forEach(function (r) { if (!r.fy) r.fy = fy; });
+    x.version = 2;
+    return x;
   }
   function save(msg) {
     if (msg) {
@@ -98,6 +107,11 @@
   function inFY(d) { return d && d >= fyStart() && d <= fyEnd(); }
   function monthOf(key) { return BY_KEY[key].month; }
   function calYear(key) { return +key >= 4 ? S.settings.startYear : S.settings.startYear + 1; }
+  function fyOf(date) { var y = +date.slice(0, 4), m = +date.slice(5, 7); return m >= 4 ? y : y - 1; }
+  // 事業開始日より前に終わる月は、研修の対象にしない
+  function beforeOpen(key) { var o = S.settings.openDate; return !!o && calYear(key) + '-' + key + '-31' < o; }
+  function activeMonths() { return MONTHS.filter(function (m) { return !beforeOpen(m.key); }); }
+  function statusOf(key) { return beforeOpen(key) ? '事業開始前' : sessionView(key).status; }
   function minutesBetween(a, b) {
     if (!a || !b) return '';
     var x = a.split(':'), y = b.split(':');
@@ -154,24 +168,25 @@
     return true;
   }
   function session(key) {
-    if (!S.sessions[key]) {
+    var sk = S.settings.startYear + '-' + key;
+    if (!S.sessions[sk]) {
       var m = BY_KEY[key];
-      S.sessions[key] = {
+      S.sessions[sk] = {
         status: '予定', date: '', start: '', end: '', place: [], instructorName: '', instructorTitle: m.instructor,
         summary: m.content, qa: '', issues: '', note: '', recordDate: '', recorder: '', managerCheckDate: '', managerName: '',
         materials: ['研修資料', '確認テスト'], materialsOther: '', absentMethod: ['資料回覧＋確認テスト'], absentOther: '',
         attendees: {}, absentees: {}, paperScores: {}
       };
     }
-    return S.sessions[key];
+    return S.sessions[sk];
   }
-  function sessionView(key) { return S.sessions[key] || session(key); }
+  function sessionView(key) { return session(key); }
   function targets(key) {
     var ss = sessionView(key);
     return S.staff.filter(function (s) { return activeOn(s, ss.date); });
   }
   function officialResults(staffId, key) {
-    return S.results.filter(function (r) { return r.staffId === staffId && r.month === key && r.kind !== '練習'; })
+    return S.results.filter(function (r) { return r.staffId === staffId && r.month === key && r.fy === S.settings.startYear && r.kind !== '練習'; })
       .sort(function (a, b) { return a.takenAt < b.takenAt ? -1 : 1; });
   }
   // 記録用の点数：アプリで受けた最初の正式受験の点数（なければ紙テストの手入力）
@@ -229,7 +244,11 @@
 
   function render() {
     var h = location.hash.replace(/^#/, '') || '/';
-    document.getElementById('office-name').textContent = (S.settings.office || '事業所名未設定') + '　' + reiwa(S.settings.startYear);
+    document.getElementById('office-name').textContent = S.settings.office || '事業所名未設定';
+    var fs = document.getElementById('fy-select'), cy = fyOf(today());
+    var y0 = Math.min(S.settings.openDate ? fyOf(S.settings.openDate) : cy, S.settings.startYear), y1 = Math.max(cy + 1, S.settings.startYear), opts = '';
+    for (var y = y1; y >= y0; y--) opts += '<option value="' + y + '"' + (y === S.settings.startYear ? ' selected' : '') + '>' + reiwa(y) + '</option>';
+    fs.innerHTML = opts;
     document.getElementById('nav').classList.remove('open');
     Array.prototype.forEach.call(document.querySelectorAll('#nav a'), function (a) {
       var p = a.getAttribute('href').slice(1);
@@ -242,6 +261,10 @@
     app.innerHTML = '<p>ページが見つかりません。<a href="#/">ホームへ</a></p>';
   }
   window.addEventListener('hashchange', render);
+  document.getElementById('fy-select').onchange = function (e) {
+    S.settings.startYear = +e.target.value; T = null;
+    save('表示年度を' + reiwa(S.settings.startYear) + 'に切り替え'); toast(reiwa(S.settings.startYear) + 'の記録を表示しています'); render();
+  };
   document.getElementById('nav-toggle').onclick = function () { document.getElementById('nav').classList.toggle('open'); };
 
   // 描画後に呼ぶ処理（フォームのイベントなど）
@@ -251,7 +274,7 @@
   function go(h) { if (location.hash === '#' + h) render(); else location.hash = h; }
 
   function statusBadge(st) {
-    var cls = st === '実施済' ? 'ok' : st === '予定' ? 'gray' : 'warn';
+    var cls = st === '実施済' ? 'ok' : st === '予定' || st === '事業開始前' ? 'gray' : 'warn';
     return '<span class="badge ' + cls + '">' + esc(st) + '</span>';
   }
   function legalBadge(m) { return m.legal ? '<span class="badge legal">★法定</span>' : ''; }
@@ -264,7 +287,7 @@
     var curMonth = pad(new Date().getMonth() + 1);
     var cur = BY_KEY[curMonth];
     var done = MONTHS.filter(function (m) { return sessionView(m.key).status === '実施済'; });
-    var legal = MONTHS.filter(function (m) { return m.legal; });
+    var legal = activeMonths().filter(function (m) { return m.legal; });
     var legalDone = legal.filter(function (m) { return sessionView(m.key).status === '実施済'; });
     var pending = [], follow = [];
     done.forEach(function (m) {
@@ -279,13 +302,13 @@
     return '<h1>ホーム</h1>' + noStaffNotice() +
       (S.settings.office ? '' : '<div class="notice">はじめに<a href="#/settings">設定</a>で事業所名・年度・担当者を入力してください。</div>') +
       '<div class="stats">' +
-      '<div class="stat"><div class="muted">実施済の研修</div><div class="v">' + done.length + ' / 12</div></div>' +
+      '<div class="stat"><div class="muted">実施済の研修</div><div class="v">' + done.length + ' / ' + activeMonths().length + '</div></div>' +
       '<div class="stat"><div class="muted">法定研修（★）</div><div class="v">' + legalDone.length + ' / ' + legal.length + '</div></div>' +
       '<div class="stat"><div class="muted">登録職員（在籍）</div><div class="v">' + S.staff.filter(function (s) { return !s.retireDate; }).length + '名</div></div>' +
       '<div class="stat"><div class="muted">要フォロー（' + (S.settings.passMark - 1) + '点以下）</div><div class="v">' + follow.length + '件</div></div>' +
       '</div>' +
       '<h2>今月の研修</h2>' +
-      '<div class="card"><div class="m"><b>' + esc(cur.month) + '</b>　' + esc(cur.theme) + legalBadge(cur) + statusBadge(sessionView(cur.key).status) + '</div>' +
+      '<div class="card"><div class="m"><b>' + esc(cur.month) + '</b>　' + esc(cur.theme) + legalBadge(cur) + statusBadge(statusOf(cur.key)) + '</div>' +
       '<p class="muted">' + esc(cur.content) + '</p>' +
       '<div class="actions"><a class="btn" href="#/m/' + cur.key + '">研修資料を読む</a><a class="btn" href="#/test/' + cur.key + '">確認テストを受ける</a><a class="btn sub" href="#/record/' + cur.key + '">実施記録を書く</a></div></div>' +
       (issues.length ? '<h2>運営指導に向けて対応が必要なこと</h2><div class="card"><ul>' + issues.map(function (c) { return '<li>' + esc(c.name) + '：' + esc(c.detail) + '</li>'; }).join('') + '</ul><a href="#/inspection">運営指導対応ページへ</a></div>' : '') +
@@ -297,7 +320,7 @@
   route(/^\/materials$/, function () {
     return '<h1>研修資料・確認テスト</h1><p class="muted">★は法定研修（運営基準で年1回以上の実施が義務）です。研修資料を読んだ後、確認テスト（10問・' + S.settings.passMark + '点以上が目安）を受けてください。</p>' +
       '<div class="grid">' + MONTHS.map(function (m) {
-        return '<a class="card month-card" href="#/m/' + m.key + '"><div><span class="m">' + esc(m.month) + '</span>' + legalBadge(m) + statusBadge(sessionView(m.key).status) + '</div>' +
+        return '<a class="card month-card" href="#/m/' + m.key + '"><div><span class="m">' + esc(m.month) + '</span>' + legalBadge(m) + statusBadge(statusOf(m.key)) + '</div>' +
           '<div><b>' + esc(m.theme) + '</b></div><div class="muted small">' + esc(m.content) + '</div></a>';
       }).join('') + '</div>';
   });
@@ -538,7 +561,7 @@
         T.step = 'result'; T.score = score;
         if (T.kind !== '練習') {
           T.resultId = uid();
-          S.results.push({ id: T.resultId, staffId: T.staffId, month: key, kind: T.kind, score: score, answers: T.answers.slice(), startedAt: T.startedAt, takenAt: nowISO() });
+          S.results.push({ id: T.resultId, fy: S.settings.startYear, staffId: T.staffId, month: key, kind: T.kind, score: score, answers: T.answers.slice(), startedAt: T.startedAt, takenAt: nowISO() });
           if (T.kind === '回覧') {
             var ss = session(key);
             ss.attendees[T.staffId] = ss.attendees[T.staffId] || '欠席';
@@ -614,7 +637,7 @@
         todo.forEach(function (x) {
           var s = x.s, ans = x.ans, kind = d['k_' + s.id];
           var score = qs.filter(function (q, i) { return ans[i] === q.answer; }).length;
-          var r = { id: uid(), staffId: s.id, month: key, kind: kind, score: score, answers: ans, source: '紙', startedAt: '', takenAt: date + 'T' + nowISO().slice(11) };
+          var r = { id: uid(), fy: S.settings.startYear, staffId: s.id, month: key, kind: kind, score: score, answers: ans, source: '紙', startedAt: '', takenAt: date + 'T' + nowISO().slice(11) };
           S.results.push(r); ids.push(r.id);
           var se = session(key);
           if (!se.attendees[s.id]) se.attendees[s.id] = kind === '回覧' ? '欠席' : '参加';
@@ -680,11 +703,11 @@
 
   // 研修実施記録一覧
   route(/^\/records$/, function () {
-    return '<h1>研修実施記録</h1><p class="muted">研修ごとに、実施日・講師・参加者・欠席者への対応を記録します（様式1・様式2）。実際に行った内容をそのまま記入してください。</p>' + noStaffNotice() +
+    return '<h1>研修実施記録（' + reiwa(S.settings.startYear) + '）</h1><p class="muted">研修ごとに、実施日・講師・参加者・欠席者への対応を記録します（様式1・様式2）。実際に行った内容をそのまま記入してください。</p>' + noStaffNotice() +
       '<div class="table-wrap"><table><tr><th>月</th><th>研修テーマ</th><th>状況</th><th>実施日</th><th class="c">参加/対象</th><th class="c">受講完了</th><th class="c">平均点</th><th class="c">要フォロー</th><th></th></tr>' +
       MONTHS.map(function (m) {
         var ss = sessionView(m.key), st = sessionStats(m.key);
-        return '<tr><td>' + esc(m.month) + '</td><td>' + esc(m.theme) + legalBadge(m) + '</td><td>' + statusBadge(ss.status) + '</td><td>' + esc(wa(ss.date)) + '</td>' +
+        return '<tr><td>' + esc(m.month) + '</td><td>' + esc(m.theme) + legalBadge(m) + '</td><td>' + statusBadge(statusOf(m.key)) + '</td><td>' + esc(wa(ss.date)) + '</td>' +
           '<td class="c">' + (ss.status === '実施済' ? st.present + '/' + st.target : '') + '</td><td class="c">' + (ss.status === '実施済' ? st.done + '/' + st.target : '') + '</td>' +
           '<td class="c">' + st.avg + '</td><td class="c">' + (st.follow.length || '') + '</td><td><a href="#/record/' + m.key + '">記入</a>　<a href="#/print/record/' + m.key + '">印刷</a></td></tr>';
       }).join('') + '</table></div>';
@@ -956,15 +979,21 @@
 
   // ---------- 運営指導対応 ----------
   function complianceChecks() {
-    var past = function (key) { var y = calYear(key); return today() > y + '-' + key + '-31'; };
+    var past = function (key) { var y = calYear(key); return !beforeOpen(key) && today() > y + '-' + key + '-31'; };
+    var na = function (months) { return months.every(beforeOpen); };
+    var naText = '事業開始（' + wa(S.settings.openDate) + '）より前の予定月のため、今年度は対象外（指定権者の指導も確認）';
     var fyOver = today() > fyEnd();
     var out = [];
     LEGAL_GROUPS.forEach(function (g) {
+      if (na(g.months) && !g.months.some(function (k) { return sessionView(k).status === '実施済'; })) {
+        out.push({ name: g.name + ' 研修（年1回以上）', ok: false, na: true, detail: naText, due: false });
+        return;
+      }
       var done = g.months.filter(function (k) { return sessionView(k).status === '実施済'; });
       out.push({
         name: g.name + ' 研修（年1回以上）', ok: done.length > 0,
         detail: done.length ? done.map(function (k) { return monthOf(k) + '（' + wa(sessionView(k).date) + '）'; }).join('、') : '未実施（計画：' + g.months.map(monthOf).join('・') + '）',
-        due: g.months.every(past) || fyOver
+        due: g.months.filter(function (k) { return !beforeOpen(k); }).every(past) || fyOver
       });
       // 全職員の受講
       var staffNg = S.staff.filter(function (s) {
@@ -974,18 +1003,19 @@
       if (done.length) out.push({ name: g.name + ' 全職員の受講', ok: !staffNg.length, detail: staffNg.length ? '未完了：' + staffNg.map(function (s) { return s.name; }).join('、') : '対象職員全員が受講または資料回覧・テスト提出済み', due: true });
     });
     var c1 = committeeRecordsFor('虐待防止検討委員会'), c2 = committeeRecordsFor('感染対策委員会');
-    out.push({ name: '虐待防止検討委員会（定期的に開催）', ok: c1.length > 0, detail: c1.length ? c1.map(function (r) { return wa(r.date); }).join('、') : '今年度の議事録なし（計画：5月・12月）', due: past('05') });
-    out.push({ name: '感染対策委員会（おおむね6月に1回以上）', ok: c2.length >= 2 || (c2.length >= 1 && !past('12')), detail: c2.length ? c2.length + '回：' + c2.map(function (r) { return wa(r.date); }).join('、') : '今年度の議事録なし（計画：6月・12月）', due: past('06') });
+    var push = function (o, months) { if (!o.ok && na(months)) { o.na = true; o.due = false; o.detail = naText; } out.push(o); };
+    push({ name: '虐待防止検討委員会（定期的に開催）', ok: c1.length > 0, detail: c1.length ? c1.map(function (r) { return wa(r.date); }).join('、') : '今年度の議事録なし（計画：5月・12月）', due: past('05') }, ['05', '12']);
+    push({ name: '感染対策委員会（おおむね6月に1回以上）', ok: c2.length >= 2 || (c2.length >= 1 && !past('12')), detail: c2.length ? c2.length + '回：' + c2.map(function (r) { return wa(r.date); }).join('、') : '今年度の議事録なし（計画：6月・12月）', due: past('06') }, ['06', '12']);
     var dI = committeeRecordsFor('感染症まん延防止訓練'), dN = committeeRecordsFor('BCP訓練（自然災害）'), dC = committeeRecordsFor('BCP訓練（感染症）');
-    out.push({ name: '感染症まん延防止訓練（年1回以上）', ok: dI.length > 0, detail: dI.length ? dI.map(function (r) { return wa(r.date); }).join('、') : '記録なし（計画：11月）', due: past('11') });
-    out.push({ name: 'BCP訓練 自然災害（年1回以上）', ok: dN.length > 0, detail: dN.length ? dN.map(function (r) { return wa(r.date); }).join('、') : '記録なし（計画：7月）', due: past('07') });
-    out.push({ name: 'BCP訓練 感染症（年1回以上）', ok: dC.length > 0, detail: dC.length ? dC.map(function (r) { return wa(r.date); }).join('、') : '記録なし（計画：11月）', due: past('11') });
+    push({ name: '感染症まん延防止訓練（年1回以上）', ok: dI.length > 0, detail: dI.length ? dI.map(function (r) { return wa(r.date); }).join('、') : '記録なし（計画：11月）', due: past('11') }, ['11']);
+    push({ name: 'BCP訓練 自然災害（年1回以上）', ok: dN.length > 0, detail: dN.length ? dN.map(function (r) { return wa(r.date); }).join('、') : '記録なし（計画：7月）', due: past('07') }, ['07']);
+    push({ name: 'BCP訓練 感染症（年1回以上）', ok: dC.length > 0, detail: dC.length ? dC.map(function (r) { return wa(r.date); }).join('、') : '記録なし（計画：11月）', due: past('11') }, ['11']);
     var hires = S.staff.filter(function (s) { return inFY(s.hireDate); });
     var nhNg = hires.filter(function (s) { var nh = S.newHire[s.id]; return !(nh && nh.items && nh.items[1] && nh.items[1].date); });
     out.push({ name: '新規採用時の虐待防止研修', ok: !nhNg.length, detail: hires.length ? (nhNg.length ? '未記録：' + nhNg.map(function (s) { return s.name; }).join('、') : '今年度採用' + hires.length + '名すべて実施済み') : '今年度の新規採用者なし', due: true });
     // 記録の不備
     var gaps = [];
-    MONTHS.forEach(function (m) {
+    activeMonths().forEach(function (m) {
       var ss = sessionView(m.key);
       if (ss.status !== '実施済') {
         if (past(m.key) && ss.status === '予定') gaps.push(m.month + '：予定のまま（実施済・延期の更新が必要）');
@@ -1013,7 +1043,7 @@
       '<div class="notice">運営指導（実地指導）では、研修計画・研修の実施記録・参加者の記録・欠席者への対応・委員会・訓練の記録などが確認されます。下の帳票を印刷（またはPDF保存）して、紙の署名欄に署名を集めて保管してください。</div>' +
       '<h2>法定研修・委員会・訓練の実施状況（' + reiwa(S.settings.startYear) + '）</h2>' +
       '<div class="table-wrap"><table><tr><th>項目</th><th class="c">判定</th><th>内容</th></tr>' + checks.map(function (c) {
-        var b = c.ok ? '<span class="badge ok">OK</span>' : c.due ? '<span class="badge warn">要対応</span>' : '<span class="badge gray">予定</span>';
+        var b = c.ok ? '<span class="badge ok">OK</span>' : c.na ? '<span class="badge gray">対象外</span>' : c.due ? '<span class="badge warn">要対応</span>' : '<span class="badge gray">予定</span>';
         return '<tr><td>' + esc(c.name) + '</td><td class="c">' + b + '</td><td class="small">' + esc(c.detail) + '</td></tr>';
       }).join('') + '</table></div>' +
       '<p class="muted small">判定は研修計画（年間研修計画シート）と運営基準の頻度をもとにした目安です。指定権者（都道府県・市町村）の指導内容も確認してください。</p>' +
@@ -1042,10 +1072,10 @@
   function printLink(href, title, desc) { return '<a class="card month-card" href="' + href + '"><b>' + esc(title) + '</b><div class="muted small">' + esc(desc) + '</div></a>'; }
 
   function exportResultsCsv() {
-    var rows = [['受験日時', '月', '研修テーマ', '氏名', '種類', '方法', '点数', '要フォロー', '問1', '問2', '問3', '問4', '問5', '問6', '問7', '問8', '問9', '問10']];
+    var rows = [['受験日時', '年度', '月', '研修テーマ', '氏名', '種類', '方法', '点数', '要フォロー', '問1', '問2', '問3', '問4', '問5', '問6', '問7', '問8', '問9', '問10']];
     S.results.slice().sort(function (a, b) { return a.takenAt < b.takenAt ? -1 : 1; }).forEach(function (r) {
       var m = BY_KEY[r.month];
-      rows.push([r.takenAt.replace('T', ' '), m.month, m.theme, staffName(r.staffId), r.kind, r.source || 'アプリ', r.score, r.score < S.settings.passMark ? '要' : ''].concat(r.answers));
+      rows.push([r.takenAt.replace('T', ' '), reiwa(r.fy), m.month, m.theme, staffName(r.staffId), r.kind, r.source || 'アプリ', r.score, r.score < S.settings.passMark ? '要' : ''].concat(r.answers));
     });
     download('確認テスト受験記録_' + today() + '.csv', csv(rows), 'text/csv');
   }
@@ -1123,14 +1153,15 @@
   route(/^\/print\/plan$/, function () {
     var done = MONTHS.filter(function (m) { return sessionView(m.key).status === '実施済'; });
     var legalDone = done.filter(function (m) { return m.legal; });
+    var nAct = activeMonths().length;
     return paperShell('年間研修計画', '<div class="paper"><h1>' + reiwa(S.settings.startYear) + '　年間研修計画・実施状況（訪問介護）</h1>' + officeLine() +
       '<p class="small">★は法定研修（運営基準で年1回以上の実施が義務）</p>' +
       '<table class="list"><tr><th>月</th><th>研修テーマ</th><th>区分</th><th>主な内容</th><th>講師</th><th>実施日</th><th class="c">参加人数</th><th>状況</th><th>備考</th></tr>' +
       MONTHS.map(function (m) {
         var ss = sessionView(m.key), st = sessionStats(m.key);
-        return '<tr><td>' + esc(m.month) + '</td><td>' + (m.legal ? '★' : '') + esc(m.theme) + '</td><td>' + esc(m.category) + '</td><td class="small">' + esc(m.content) + '</td><td>' + esc(ss.instructorName || m.instructor) + '</td><td>' + esc(wa(ss.date)) + '</td><td class="c">' + (ss.status === '実施済' ? st.present + '名' : '') + '</td><td>' + esc(ss.status) + '</td><td class="small">' + esc(ss.note) + '</td></tr>';
+        return '<tr><td>' + esc(m.month) + '</td><td>' + (m.legal ? '★' : '') + esc(m.theme) + '</td><td>' + esc(m.category) + '</td><td class="small">' + esc(m.content) + '</td><td>' + esc(ss.instructorName || m.instructor) + '</td><td>' + esc(wa(ss.date)) + '</td><td class="c">' + (ss.status === '実施済' ? st.present + '名' : '') + '</td><td>' + esc(statusOf(m.key)) + '</td><td class="small">' + esc(ss.note) + '</td></tr>';
       }).join('') + '</table>' +
-      '<p>実施済の研修数：' + done.length + '　実施済の法定研修数（★）：' + legalDone.length + '　未実施の研修数：' + (12 - done.length) + '　実施率：' + Math.round(done.length / 12 * 100) + '%</p>' +
+      '<p>実施済の研修数：' + done.length + '　実施済の法定研修数（★）：' + legalDone.length + '　未実施の研修数：' + Math.max(0, nAct - done.length) + '　実施率：' + (nAct ? Math.round(done.length / nAct * 100) : 0) + '%' + (nAct < 12 ? '（事業開始' + esc(wa(S.settings.openDate)) + '以降の' + nAct + 'か月が対象）' : '') + '</p>' +
       '<h3>委員会・訓練の年間計画</h3><table class="list"><tr><th>項目</th><th>頻度の基準</th><th>実施予定月</th><th>担当</th><th>実施日</th><th>記録</th></tr>' +
       D.committees.map(function (c) {
         var recs = committeeRecordsFor(c.item);
@@ -1163,7 +1194,7 @@
         return '<tr><td>' + esc(m.month) + '</td><td>' + (m.legal ? '★' : '') + esc(m.theme) + '</td><td>' + esc(wa(sessionView(m.key).date)) + '</td><td>' + esc(completion(id, m.key)) + '</td><td class="c">' + (sc ? sc.score + '点' : '') + '</td></tr>';
       }).join('') + '</table>' +
       '<h3>確認テスト受験記録</h3><table class="list"><tr><th>受験日時</th><th>研修</th><th>種類</th><th class="c">点数</th></tr>' +
-      (rs.length ? rs.map(function (r) { return '<tr><td>' + esc(waDateTime(r.takenAt)) + '</td><td>' + esc(monthOf(r.month) + ' ' + BY_KEY[r.month].theme) + '</td><td>' + esc(r.kind) + '</td><td class="c">' + r.score + '点</td></tr>'; }).join('') : '<tr><td colspan="4">記録なし</td></tr>') + '</table></div>');
+      (rs.length ? rs.map(function (r) { return '<tr><td>' + esc(waDateTime(r.takenAt)) + '</td><td>' + esc(reiwa(r.fy) + ' ' + monthOf(r.month) + ' ' + BY_KEY[r.month].theme) + '</td><td>' + esc(r.kind) + '</td><td class="c">' + r.score + '点</td></tr>'; }).join('') : '<tr><td colspan="4">記録なし</td></tr>') + '</table></div>');
   });
 
   function paperCommittee(c) {
@@ -1249,7 +1280,7 @@
         e.preventDefault();
         var d = formData(f);
         st.office = d.office; st.manager = d.manager; st.abuseOfficer = d.abuseOfficer; st.infectionOfficer = d.infectionOfficer;
-        st.startYear = +d.startYear || st.startYear; st.passMark = Math.max(1, Math.min(10, +d.passMark || 7));
+        st.startYear = +d.startYear || st.startYear; st.openDate = d.openDate || ''; st.passMark = Math.max(1, Math.min(10, +d.passMark || 7));
         save('設定を更新'); toast('保存しました'); render();
       };
       document.getElementById('backup').onclick = function () {
@@ -1288,7 +1319,8 @@
     return '<h1>設定・バックアップ</h1>' +
       '<form id="set" class="card"><h3>事業所の設定</h3><div class="row">' +
       '<div><label>事業所名</label><input type="text" name="office" value="' + esc(st.office) + '"></div>' +
-      '<div><label>年度（開始年・西暦）</label><input type="number" name="startYear" value="' + esc(st.startYear) + '"><div class="muted small">' + reiwa(st.startYear) + '（' + wa(fyStart()) + '〜' + wa(fyEnd()) + '）</div></div>' +
+      '<div><label>表示する年度（開始年・西暦）</label><input type="number" name="startYear" value="' + esc(st.startYear) + '"><div class="muted small">' + reiwa(st.startYear) + '（' + wa(fyStart()) + '〜' + wa(fyEnd()) + '）。画面上部でも切り替えられます。記録は年度ごとに別々に保存されます</div></div>' +
+      '<div><label>事業開始日</label><input type="date" name="openDate" value="' + esc(st.openDate) + '"><div class="muted small">この日より前の月の研修は「事業開始前」として対象外になります</div></div>' +
       '<div><label>管理者</label><input type="text" name="manager" value="' + esc(st.manager) + '"></div>' +
       '<div><label>虐待防止担当者</label><input type="text" name="abuseOfficer" value="' + esc(st.abuseOfficer) + '"></div>' +
       '<div><label>感染対策担当者</label><input type="text" name="infectionOfficer" value="' + esc(st.infectionOfficer) + '"></div>' +
@@ -1304,6 +1336,7 @@
 
   // 別端末のデータを取り込む（IDが同じものは上書きしない。職員は氏名でも照合）
   function mergeIn(x) {
+    migrate(x, (x.settings && x.settings.startYear) || S.settings.startYear);
     var n = { staff: 0, updated: 0, results: 0, meetings: 0 };
     var idMap = {};
     (x.staff || []).forEach(function (s) {
