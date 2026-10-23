@@ -1554,6 +1554,13 @@
     // 解答用紙の差し替え：取り込みファイルで指定された古いテスト結果を消す
     var drop = {};
     (x.removeResults || []).forEach(function (id) { drop[id] = 1; });
+    // 職員・年度・月で指定された結果も差し替える（取り込むファイルに入っている結果は残す）
+    var keep = {};
+    (x.results || []).forEach(function (r) { keep[r.id] = 1; });
+    (x.replaceResults || []).forEach(function (q) {
+      var st = S.staff.filter(function (t) { return t.name === q.name; })[0];
+      if (st) S.results.forEach(function (r) { if (r.staffId === st.id && r.fy === q.fy && r.month === q.month && !keep[r.id]) drop[r.id] = 1; });
+    });
     var before = S.results.length;
     S.results = S.results.filter(function (r) { return !drop[r.id]; });
     n.removed = before - S.results.length;
