@@ -1591,7 +1591,12 @@
     Object.keys(x.sessionPatch || {}).forEach(function (k) {
       var dst = S.sessions[k];
       if (!dst) return;
-      Object.keys(x.sessionPatch[k]).forEach(function (f) { dst[f] = x.sessionPatch[k][f]; });
+      Object.keys(x.sessionPatch[k]).forEach(function (f) {
+        var v = x.sessionPatch[k][f];
+        // 出欠・資料受領日などは職員ごとに入れる（取り込み元の職員IDをこの端末のIDに直す）
+        if (f === 'attendees' || f === 'absentees') Object.keys(v).forEach(function (sid) { dst[f][idMap[sid] || sid] = v[sid]; });
+        else dst[f] = v;
+      });
       n.patched = (n.patched || 0) + 1;
     });
     Object.keys(x.newHire || {}).forEach(function (sid) {
