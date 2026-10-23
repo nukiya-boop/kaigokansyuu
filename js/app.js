@@ -9,7 +9,7 @@
   var STORE_KEY = 'kaigoTraining.v1';
   var STATUSES = ['予定', '実施済', '延期', '中止'];
   var PLACES = ['事業所内', 'オンライン', '外部研修', '資料回覧'];
-  var JOBS = ['従業員', '訪問介護員', 'サービス提供責任者', '管理者', '事務員', 'その他'];
+  var JOBS = ['従業員', '訪問介護員', 'サービス提供責任者', '看護師', '管理者', '事務員', 'その他'];
   var EMPLOYMENTS = ['常勤', '非常勤', '登録ヘルパー'];
   var COMMITTEE_TYPES = ['虐待防止検討委員会', '感染対策委員会', '合同開催'];
   var DRILL_TYPES = ['BCP（自然災害）', 'BCP（感染症）', '感染症まん延防止訓練'];
@@ -23,6 +23,46 @@
     '同行訪問',
     '同行訪問'
   ];
+  // 事業所の職員名簿（資格別・在籍期間つき）。初回起動時に登録し、職員画面から不足分を追加できる
+  // 事業開始日（令和8年2月1日）。この月から毎年度ずっと記録できる
+  var OPEN_DATE = '2026-02-01';
+  var QUALIFICATIONS = ['介護福祉士', '看護師', '実務者研修', '初任者研修'];
+  var ROSTER = [
+    { qualification: '介護福祉士', job: '訪問介護員', names: [
+      { name: '佐藤春菜', hireDate: '2026-02-01', retireDate: '2026-03-17' },
+      { name: '長田由美', hireDate: '2026-02-01', retireDate: '2026-03-31' },
+      { name: '野田淳子', hireDate: '2026-02-01', retireDate: '2026-03-15' },
+      { name: '北谷英子', hireDate: '2026-02-01', retireDate: '2026-02-28' },
+      { name: '櫻井冬弥', hireDate: '2026-02-01', retireDate: '2026-06-30' },
+      { name: '岩谷桃子', hireDate: '2026-02-01', retireDate: '2026-04-15' },
+      { name: 'LE DUC LINH', hireDate: '2026-02-01', retireDate: '2026-04-30' },
+      { name: 'NGUYEN THI THANH', hireDate: '2026-02-01', retireDate: '2026-04-30' },
+      { name: 'DUONG THI HUONG GIANG', hireDate: '2026-02-01', retireDate: '2026-04-30' }
+    ] },
+    { qualification: '看護師', job: '看護師', names: [
+      { name: '園田沙耶香', hireDate: '2026-04-01', retireDate: '2026-06-15' },
+      { name: '松村知恵', hireDate: '2026-04-01', retireDate: '2026-06-30' }
+    ] },
+    { qualification: '実務者研修', job: '訪問介護員', names: [
+      { name: '山下敦也', hireDate: '2026-02-01', retireDate: '2026-03-08' },
+      { name: '吉田俊輔', hireDate: '2026-02-01', retireDate: '' }
+    ] },
+    { qualification: '初任者研修', job: '訪問介護員', names: [
+      { name: '吉田麻美', hireDate: '2026-02-01', retireDate: '' },
+      { name: '生田友哉', hireDate: '2026-02-01', retireDate: '' },
+      { name: 'WIN YADANAR AWNG', hireDate: '2026-09-07', retireDate: '' },
+      { name: '横山琴美', hireDate: '2026-02-01', retireDate: '2026-03-07' },
+      { name: '今田慶子', hireDate: '2026-02-01', retireDate: '2026-03-08' }
+    ] }
+  ];
+  function rosterStaff() {
+    var out = [];
+    ROSTER.forEach(function (g) {
+      g.names.forEach(function (n) { out.push({ id: uid(), name: n.name, job: g.job, employment: '', hireDate: n.hireDate, qualification: g.qualification, retireDate: n.retireDate }); });
+    });
+    return out;
+  }
+  function sameName(a, b) { return a.replace(/[\s　]/g, '') === b.replace(/[\s　]/g, ''); }
   // 法定研修の区分と、該当する月
   var LEGAL_GROUPS = [
     { id: 'abuse', name: '高齢者虐待防止・身体的拘束等の適正化', months: ['05', '12'] },
@@ -34,7 +74,7 @@
   function defaultState() {
     return {
       version: 2,
-      settings: { office: '', startYear: 2026, openDate: '', manager: '', abuseOfficer: '', infectionOfficer: '', passMark: 7 },
+      settings: { office: '', startYear: fyOf(today()), seenFy: fyOf(today()), openDate: OPEN_DATE, manager: '', abuseOfficer: '', infectionOfficer: '', passMark: 7 },
       staff: [],
       sessions: {},
       results: [],
@@ -44,6 +84,7 @@
       log: []
     };
   }
+  var fyChanged = false;
   var S = load();
 
   function load() {
@@ -54,10 +95,18 @@
         var d = defaultState();
         Object.keys(d).forEach(function (k) { if (s[k] === undefined) s[k] = d[k]; });
         Object.keys(d.settings).forEach(function (k) { if (s.settings[k] === undefined) s.settings[k] = d.settings[k]; });
-        return migrate(s, s.settings.startYear);
+        if (!s.settings.openDate) s.settings.openDate = OPEN_DATE;
+        migrate(s, s.settings.startYear);
+        // 新しい年度になって初めて開いたときは、その年度の表示に切り替える
+        var cy = fyOf(today());
+        if (s.settings.seenFy < cy) { s.settings.startYear = cy; s.settings.seenFy = cy; fyChanged = true; }
+        return s;
       }
     } catch (e) { console.error(e); }
-    return defaultState();
+    var d = defaultState();
+    d.staff = rosterStaff();
+    try { localStorage.setItem(STORE_KEY, JSON.stringify(d)); } catch (e) { console.error(e); }
+    return d;
   }
   // 版1のデータ（研修記録が月だけで管理されていた）を年度つきに直す
   function migrate(x, fy) {
@@ -160,6 +209,11 @@
 
   // ---------- 職員・受講状況の判定 ----------
   function staffById(id) { return S.staff.filter(function (s) { return s.id === id; })[0]; }
+  // 資格が複数書かれている場合は上位の資格（QUALIFICATIONS の順）で数える
+  function qualRank(s) {
+    for (var i = 0; i < QUALIFICATIONS.length; i++) if ((s.qualification || '').indexOf(QUALIFICATIONS[i]) >= 0) return i;
+    return QUALIFICATIONS.length;
+  }
   function staffName(id) { var s = staffById(id); return s ? s.name : '（削除された職員）'; }
   function activeOn(s, date) {
     if (!date) return !s.retireDate;
@@ -932,8 +986,42 @@
         toast('登録しました'); render();
       };
     });
-    var list = S.staff.slice().sort(function (a, b) { return (a.retireDate ? 1 : 0) - (b.retireDate ? 1 : 0); });
+    var roster = rosterStaff();
+    var missing = roster.filter(function (r) { return !S.staff.some(function (s) { return sameName(s.name, r.name); }); });
+    // 登録済みで、入職日・退職日・資格が空欄の職員は名簿の内容で埋める（入力済みの値は変えない）
+    var fills = [];
+    roster.forEach(function (r) {
+      var s = S.staff.filter(function (t) { return sameName(t.name, r.name); })[0];
+      if (s && ['hireDate', 'retireDate', 'qualification'].some(function (k) { return !s[k] && r[k]; })) fills.push([s, r]);
+    });
+    later(function () {
+      var b = document.getElementById('roster-add');
+      if (b) b.onclick = function () {
+        if (!confirm('職員名簿から、未登録の職員 ' + missing.length + '名を登録し、' + fills.length + '名の空欄（入職日・退職日・資格）を埋めますか？')) return;
+        missing.forEach(function (r) { S.staff.push(r); });
+        fills.forEach(function (f) { ['hireDate', 'retireDate', 'qualification'].forEach(function (k) { if (!f[0][k]) f[0][k] = f[1][k]; }); });
+        save('職員名簿から登録・反映：' + missing.concat(fills.map(function (f) { return f[0]; })).map(function (r) { return r.name; }).join('、'));
+        toast('名簿を反映しました'); render();
+      };
+    });
+    var list = S.staff.slice().sort(function (a, b) {
+      return (a.retireDate ? 1 : 0) - (b.retireDate ? 1 : 0) || qualRank(a) - qualRank(b);
+    });
+    var active = S.staff.filter(function (s) { return activeOn(s, today()); });
+    var groups = QUALIFICATIONS.concat(['その他・未入力']);
+    var noHire = active.filter(function (s) { return !s.hireDate; }).length;
     return '<h1>職員</h1>' +
+      '<div class="card"><h3>資格別の人数（登録 ' + S.staff.length + '名・今日時点の在籍 ' + active.length + '名）</h3><div class="table-wrap"><table><tr><th>資格</th><th>人数</th><th>在籍</th><th>職員</th></tr>' +
+      groups.map(function (q, i) {
+        var ps = list.filter(function (s) { return qualRank(s) === i; });
+        if (!ps.length && i === QUALIFICATIONS.length) return '';
+        return '<tr><td>' + esc(q) + '</td><td>' + ps.length + '名</td><td>' + ps.filter(function (s) { return active.indexOf(s) >= 0; }).length + '名</td><td>' +
+          ps.map(function (s) { return esc(s.name) + (active.indexOf(s) < 0 ? '<span class="muted small">（' + (s.hireDate > today() ? '入職前' : '退職') + '）</span>' : ''); }).join('、') + '</td></tr>';
+      }).join('') +
+      '</table></div>' +
+      (missing.length || fills.length ? '<p class="muted small">事業所の職員名簿のうち、未登録 ' + missing.length + '名' + (missing.length ? '（' + esc(missing.map(function (r) { return r.name; }).join('、')) + '）' : '') + '、入職日・退職日などが空欄 ' + fills.length + '名です。</p><div class="actions"><button type="button" id="roster-add">職員名簿を反映</button></div>' : '') +
+      (noHire ? '<p class="muted small">入職日が未入力の職員が ' + noHire + '名います。「編集」から入職日を入れると、研修の対象者や新規採用時研修の対象が正しく判定されます。</p>' : '') +
+      '</div>' +
       '<form id="sf" class="card"><h3>職員を登録</h3><div class="row">' +
       '<div><label>氏名</label><input type="text" name="name"></div>' +
       '<div><label>職種</label><select name="job">' + opt(JOBS, '訪問介護員') + '</select></div>' +
@@ -1080,11 +1168,11 @@
     download('確認テスト受験記録_' + today() + '.csv', csv(rows), 'text/csv');
   }
   function exportMatrixCsv() {
-    var head = ['氏名', '職種', '雇用形態', '入職日', '退職日'];
+    var head = ['氏名', '職種', '雇用形態', '資格', '入職日', '退職日'];
     MONTHS.forEach(function (m) { head.push(m.month + ' 受講', m.month + ' 点数'); });
     var rows = [head];
     S.staff.forEach(function (s) {
-      var r = [s.name, s.job, s.employment, s.hireDate, s.retireDate];
+      var r = [s.name, s.job, s.employment, s.qualification, s.hireDate, s.retireDate];
       MONTHS.forEach(function (m) { var sc = scoreOf(s.id, m.key); r.push(completion(s.id, m.key), sc ? sc.score : ''); });
       rows.push(r);
     });
@@ -1280,7 +1368,7 @@
         e.preventDefault();
         var d = formData(f);
         st.office = d.office; st.manager = d.manager; st.abuseOfficer = d.abuseOfficer; st.infectionOfficer = d.infectionOfficer;
-        st.startYear = +d.startYear || st.startYear; st.openDate = d.openDate || ''; st.passMark = Math.max(1, Math.min(10, +d.passMark || 7));
+        st.startYear = +d.startYear || st.startYear; st.openDate = d.openDate || OPEN_DATE; st.passMark = Math.max(1, Math.min(10, +d.passMark || 7));
         save('設定を更新'); toast('保存しました'); render();
       };
       document.getElementById('backup').onclick = function () {
@@ -1313,7 +1401,7 @@
       document.getElementById('reset').onclick = function () {
         if (!confirm('すべてのデータを削除します。先にバックアップを保存してください。本当に削除しますか？')) return;
         if (prompt('確認のため「削除」と入力してください') !== '削除') return;
-        localStorage.removeItem(STORE_KEY); S = defaultState(); render();
+        localStorage.removeItem(STORE_KEY); S = load(); render();
       };
     });
     return '<h1>設定・バックアップ</h1>' +
@@ -1384,4 +1472,5 @@
   }
 
   render();
+  if (fyChanged) toast(reiwa(S.settings.startYear) + 'になりました。今年度の記録を表示しています');
 })();
