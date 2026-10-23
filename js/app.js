@@ -23,7 +23,7 @@
     '同行訪問',
     '同行訪問'
   ];
-  // 事業所の職員名簿（資格別・在籍期間つき）。初回起動時に登録し、職員画面から不足分を追加できる
+  // 事業所の職員名簿（資格別・在籍期間つき。雇用形態は指定がなければ常勤）。初回起動時に登録し、職員画面から不足分を追加できる
   // 事業開始日（令和8年2月1日）。この月から毎年度ずっと記録できる
   var OPEN_DATE = '2026-02-01';
   var QUALIFICATIONS = ['介護福祉士', '看護師', '実務者研修', '初任者研修'];
@@ -51,14 +51,14 @@
       { name: '吉田麻美', hireDate: '2026-02-01', retireDate: '' },
       { name: '生田友哉', hireDate: '2026-02-01', retireDate: '' },
       { name: 'WIN YADANAR AWNG', hireDate: '2026-09-07', retireDate: '' },
-      { name: '横山琴美', hireDate: '2026-02-01', retireDate: '2026-03-07' },
+      { name: '横山琴美', hireDate: '2026-02-01', retireDate: '2026-03-07', employment: '非常勤' },
       { name: '今田慶子', hireDate: '2026-02-01', retireDate: '2026-03-08' }
     ] }
   ];
   function rosterStaff() {
     var out = [];
     ROSTER.forEach(function (g) {
-      g.names.forEach(function (n) { out.push({ id: uid(), name: n.name, job: g.job, employment: '', hireDate: n.hireDate, qualification: g.qualification, retireDate: n.retireDate }); });
+      g.names.forEach(function (n) { out.push({ id: uid(), name: n.name, job: g.job, employment: n.employment || '常勤', hireDate: n.hireDate, qualification: g.qualification, retireDate: n.retireDate }); });
     });
     return out;
   }
@@ -988,18 +988,18 @@
     });
     var roster = rosterStaff();
     var missing = roster.filter(function (r) { return !S.staff.some(function (s) { return sameName(s.name, r.name); }); });
-    // 登録済みで、入職日・退職日・資格が空欄の職員は名簿の内容で埋める（入力済みの値は変えない）
+    // 登録済みで、入職日・退職日・資格・雇用形態が空欄の職員は名簿の内容で埋める（入力済みの値は変えない）
     var fills = [];
     roster.forEach(function (r) {
       var s = S.staff.filter(function (t) { return sameName(t.name, r.name); })[0];
-      if (s && ['hireDate', 'retireDate', 'qualification'].some(function (k) { return !s[k] && r[k]; })) fills.push([s, r]);
+      if (s && ['hireDate', 'retireDate', 'qualification', 'employment'].some(function (k) { return !s[k] && r[k]; })) fills.push([s, r]);
     });
     later(function () {
       var b = document.getElementById('roster-add');
       if (b) b.onclick = function () {
-        if (!confirm('職員名簿から、未登録の職員 ' + missing.length + '名を登録し、' + fills.length + '名の空欄（入職日・退職日・資格）を埋めますか？')) return;
+        if (!confirm('職員名簿から、未登録の職員 ' + missing.length + '名を登録し、' + fills.length + '名の空欄（入職日・退職日・資格・雇用形態）を埋めますか？')) return;
         missing.forEach(function (r) { S.staff.push(r); });
-        fills.forEach(function (f) { ['hireDate', 'retireDate', 'qualification'].forEach(function (k) { if (!f[0][k]) f[0][k] = f[1][k]; }); });
+        fills.forEach(function (f) { ['hireDate', 'retireDate', 'qualification', 'employment'].forEach(function (k) { if (!f[0][k]) f[0][k] = f[1][k]; }); });
         save('職員名簿から登録・反映：' + missing.concat(fills.map(function (f) { return f[0]; })).map(function (r) { return r.name; }).join('、'));
         toast('名簿を反映しました'); render();
       };
@@ -1019,7 +1019,7 @@
           ps.map(function (s) { return esc(s.name) + (active.indexOf(s) < 0 ? '<span class="muted small">（' + (s.hireDate > today() ? '入職前' : '退職') + '）</span>' : ''); }).join('、') + '</td></tr>';
       }).join('') +
       '</table></div>' +
-      (missing.length || fills.length ? '<p class="muted small">事業所の職員名簿のうち、未登録 ' + missing.length + '名' + (missing.length ? '（' + esc(missing.map(function (r) { return r.name; }).join('、')) + '）' : '') + '、入職日・退職日などが空欄 ' + fills.length + '名です。</p><div class="actions"><button type="button" id="roster-add">職員名簿を反映</button></div>' : '') +
+      (missing.length || fills.length ? '<p class="muted small">事業所の職員名簿のうち、未登録 ' + missing.length + '名' + (missing.length ? '（' + esc(missing.map(function (r) { return r.name; }).join('、')) + '）' : '') + '、入職日・退職日・雇用形態などが空欄 ' + fills.length + '名です。</p><div class="actions"><button type="button" id="roster-add">職員名簿を反映</button></div>' : '') +
       (noHire ? '<p class="muted small">入職日が未入力の職員が ' + noHire + '名います。「編集」から入職日を入れると、研修の対象者や新規採用時研修の対象が正しく判定されます。</p>' : '') +
       '</div>' +
       '<form id="sf" class="card"><h3>職員を登録</h3><div class="row">' +
