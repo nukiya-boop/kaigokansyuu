@@ -234,7 +234,7 @@
     if (S.sessions[sk] && S.sessions[sk].summary === m.content) S.sessions[sk].summary = defaultSummary(m);
     if (!S.sessions[sk]) {
       S.sessions[sk] = {
-        status: '予定', date: '', start: '', end: '', place: [], instructorTitle: m.instructor,
+        status: '予定', date: '', start: '', end: '', place: [],
         summary: defaultSummary(m), qa: '', issues: '', note: '', recordDate: '', recorder: '', managerCheckDate: '', managerName: '',
         materials: ['研修資料', '確認テスト'], materialsOther: '', absentMethod: ['資料回覧＋確認テスト'], absentOther: '',
         attendees: {}, absentees: {}, paperScores: {}
@@ -518,7 +518,7 @@
     var f1 = '<div class="paper"><h1>様式1　研修実施記録</h1><p>事業所名：</p><table>' +
       trow('研修名', '') + trow('区分', box(['法定研修（虐待防止・感染症・BCP）', '事業所研修', '新規採用時研修'], [])) +
       trow('実施日時', '令和　年　月　日（　）　　時　　分 〜 　　時　　分（　　分間）') + trow('実施場所・方法', box(PLACES, [])) +
-      trow('講師', '') + trow('参加者数', '　　名（様式2 参加者名簿のとおり）／対象者　　名') +
+      trow('参加者数', '　　名（様式2 参加者名簿のとおり）／対象者　　名') +
       trow('使用資料', '□ 研修資料（　　月）　□ 確認テスト　□ その他：') + trow('研修内容の要旨', '<div style="height:5em"></div>') +
       trow('質疑・意見交換の内容', '<div style="height:4em"></div>') + trow('理解度確認の結果', '確認テスト平均　　点／満点　　点、要フォロー者　　名') +
       trow('欠席者への対応', '□ 資料回覧＋確認テスト　□ 伝達研修（　月　日）　□ その他：') + trow('今後の課題・次回への反映', '<div style="height:3em"></div>') +
@@ -769,7 +769,7 @@
 
   // 研修実施記録一覧
   route(/^\/records$/, function () {
-    return '<h1>研修実施記録（' + reiwa(S.settings.startYear) + '）</h1><p class="muted">研修ごとに、実施日・講師・参加者・欠席者への対応を記録します（様式1・様式2）。実際に行った内容をそのまま記入してください。</p>' + noStaffNotice() +
+    return '<h1>研修実施記録（' + reiwa(S.settings.startYear) + '）</h1><p class="muted">研修ごとに、実施日・参加者・欠席者への対応を記録します（様式1・様式2）。実際に行った内容をそのまま記入してください。</p>' + noStaffNotice() +
       '<div class="table-wrap"><table><tr><th>月</th><th>研修テーマ</th><th>状況</th><th>実施日</th><th class="c">参加/対象</th><th class="c">受講完了</th><th class="c">平均点</th><th class="c">要フォロー</th><th></th></tr>' +
       MONTHS.map(function (m) {
         var ss = sessionView(m.key), st = sessionStats(m.key);
@@ -790,7 +790,7 @@
       f.onsubmit = function (e) {
         e.preventDefault();
         var d = formData(f), s = session(key);
-        ['status', 'date', 'start', 'end', 'instructorTitle', 'summary', 'qa', 'issues', 'note', 'recordDate', 'recorder', 'managerCheckDate', 'managerName', 'materialsOther', 'absentOther'].forEach(function (k) { s[k] = d[k] || ''; });
+        ['status', 'date', 'start', 'end', 'summary', 'qa', 'issues', 'note', 'recordDate', 'recorder', 'managerCheckDate', 'managerName', 'materialsOther', 'absentOther'].forEach(function (k) { s[k] = d[k] || ''; });
         s.place = d.place || []; s.materials = d.materials || []; s.absentMethod = d.absentMethod || [];
         if (s.status === '実施済' && !s.date) { alert('実施済の場合は実施日を入力してください'); return; }
         if (s.status === '実施済' && !s.recordDate) s.recordDate = today();
@@ -837,7 +837,6 @@
       '<div><label>終了時刻</label><input type="time" name="end" value="' + esc(ss.end) + '"></div></div>' +
       (mins ? '<p class="muted small">研修時間：' + mins + '分間</p>' : '') +
       '<label>実施場所・方法</label>' + checks('place', PLACES, ss.place) +
-      '<label>講師</label><input type="text" name="instructorTitle" value="' + esc(ss.instructorTitle) + '">' +
       '<label>使用資料</label>' + checks('materials', ['研修資料', '確認テスト'], ss.materials) + '<input type="text" name="materialsOther" placeholder="その他の資料" value="' + esc(ss.materialsOther) + '">' +
       '<label>研修内容の要旨</label><textarea name="summary">' + esc(ss.summary) + '</textarea>' +
       '<label>質疑・意見交換の内容</label><textarea name="qa">' + esc(ss.qa) + '</textarea>' +
@@ -1303,7 +1302,6 @@
       trow('区分', box(['法定研修（虐待防止・感染症・BCP）', '事業所研修', '新規採用時研修'], [cat])) +
       trow('実施日時', esc(wa(ss.date)) + '　' + esc(ss.start) + ' 〜 ' + esc(ss.end) + (mins ? '（' + mins + '分間）' : '')) +
       trow('実施場所・方法', box(PLACES, ss.place)) +
-      trow('講師', esc(ss.instructorTitle)) +
       trow('参加者数', present.length + '名（様式2 参加者名簿のとおり）／対象者 ' + st.target + '名') +
       trow('使用資料', box(['研修資料', '確認テスト'], ss.materials).replace('研修資料', '研修資料（' + monthOf(key) + '）') + (ss.materialsOther ? '　その他：' + esc(ss.materialsOther) : '')) +
       trow('研修内容の要旨', esc(ss.summary), true) +
@@ -1349,7 +1347,7 @@
       '<table class="list"><tr><th>月</th><th>研修テーマ</th><th>区分</th><th>主な内容</th><th>講師</th><th>実施日</th><th class="c">参加人数</th><th>状況</th><th>備考</th></tr>' +
       MONTHS.map(function (m) {
         var ss = sessionView(m.key), st = sessionStats(m.key);
-        return '<tr><td>' + esc(m.month) + '</td><td>' + (m.legal ? '★' : '') + esc(m.theme) + '</td><td>' + esc(m.category) + '</td><td class="small">' + esc(m.content) + '</td><td>' + esc(ss.instructorTitle || m.instructor) + '</td><td>' + esc(wa(ss.date)) + '</td><td class="c">' + (ss.status === '実施済' ? st.present + '名' : '') + '</td><td>' + esc(statusOf(m.key)) + '</td><td class="small">' + esc(ss.note) + '</td></tr>';
+        return '<tr><td>' + esc(m.month) + '</td><td>' + (m.legal ? '★' : '') + esc(m.theme) + '</td><td>' + esc(m.category) + '</td><td class="small">' + esc(m.content) + '</td><td>' + esc(m.instructor) + '</td><td>' + esc(wa(ss.date)) + '</td><td class="c">' + (ss.status === '実施済' ? st.present + '名' : '') + '</td><td>' + esc(statusOf(m.key)) + '</td><td class="small">' + esc(ss.note) + '</td></tr>';
       }).join('') + '</table>' +
       '<p>実施済の研修数：' + done.length + '　実施済の法定研修数（★）：' + legalDone.length + '　未実施の研修数：' + Math.max(0, nAct - done.length) + '　実施率：' + (nAct ? Math.round(done.length / nAct * 100) : 0) + '%' + (nAct < 12 ? '（事業開始' + esc(wa(S.settings.openDate)) + '以降の' + nAct + 'か月が対象）' : '') + '</p>' +
       '<h3>委員会・訓練の年間計画</h3><table class="list"><tr><th>項目</th><th>頻度の基準</th><th>実施予定月</th><th>担当</th><th>実施日</th><th>記録</th></tr>' +
@@ -1587,7 +1585,9 @@
         });
       });
     });
-    // 研修記録の項目をまとめて入れる（時間・講師など。指定された項目だけ上書き）
+    // 設定（管理者名など）を取り込みファイルの内容にする
+    Object.keys(x.settingsPatch || {}).forEach(function (k) { S.settings[k] = x.settingsPatch[k]; });
+    // 研修記録の項目をまとめて入れる（時間・管理者名など。指定された項目だけ上書き）
     Object.keys(x.sessionPatch || {}).forEach(function (k) {
       var dst = S.sessions[k];
       if (!dst) return;
