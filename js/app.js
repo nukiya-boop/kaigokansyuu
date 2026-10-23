@@ -1499,7 +1499,7 @@
             } else {
               var n = mergeIn(x);
               save('データを取り込み：職員追加' + n.staff + '名・更新' + n.updated + '名、テスト' + n.results + '件' + (n.removed ? '、差し替えで削除' + n.removed + '件' : ''));
-              alert('取り込みました。職員 追加' + n.staff + '名・更新' + n.updated + '名、確認テスト ' + n.results + '件' + (n.removed ? '（差し替えで古い結果' + n.removed + '件を削除）' : '') + '、委員会・訓練 ' + n.meetings + '件' + (n.patched ? '、研修記録 ' + n.patched + '回分を更新' : '') + '。');
+              alert('取り込みました。職員 追加' + n.staff + '名・更新' + n.updated + '名、確認テスト ' + n.results + '件' + (n.removed ? '（差し替えで古い結果' + n.removed + '件を削除）' : '') + '、委員会・訓練 ' + n.meetings + '件' + (n.patched ? '、研修記録 ' + n.patched + '回分を更新' : '') + (n.relinked ? '、職員に付け直したテスト ' + n.relinked + '件' : '') + '。');
             }
             render();
           } catch (err) { alert('読み込めませんでした：' + err.message); }
@@ -1564,8 +1564,15 @@
     n.removed = before - S.results.length;
     var have = {};
     S.results.forEach(function (r) { have[r.id] = 1; });
+    var byId = {};
+    S.results.forEach(function (r) { byId[r.id] = r; });
     (x.results || []).forEach(function (r) {
-      if (have[r.id]) return;
+      if (have[r.id]) {
+        // 職員を削除してしまった後の取り込み：残っていた結果を、取り込んだ職員に付け直す
+        var e = byId[r.id];
+        if (!staffById(e.staffId) && staffById(idMap[r.staffId] || r.staffId)) { e.staffId = idMap[r.staffId] || r.staffId; n.relinked = (n.relinked || 0) + 1; }
+        return;
+      }
       r.staffId = idMap[r.staffId] || r.staffId;
       S.results.push(r); n.results++;
     });
