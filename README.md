@@ -62,4 +62,6 @@ python3 tools/extract.py 研修確認テスト集.xlsx 研修計画・研修資�
 python3 tools/make_answers.py js/data.js docs/確認テスト_解答一覧.xlsx
 ```
 
-（どちらも `pip install openpyxl` が必要です）
+解答用紙Excel（`docs/確認テスト_解答用紙.xlsx`）は `python3 tools/make_answer_sheets.py js/data.js docs/確認テスト_解答用紙.xlsx` で作り直せます。
+
+（いずれも `pip install openpyxl` が必要です）

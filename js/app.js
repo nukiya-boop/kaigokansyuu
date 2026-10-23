@@ -361,6 +361,7 @@
       '</div>' +
       '<h2>確認テスト集</h2><div class="grid">' +
       printLink('#/print/tests', '問題用紙（12か月分）', '解答なし。紙で実施する場合・欠席者への配布用') +
+      '<a class="card month-card" href="docs/' + encodeURIComponent('確認テスト_解答用紙') + '.xlsx" download><b>解答用紙Excel（12か月分）</b><div class="muted small">印刷して手書き、またはExcelに入力して提出。解答欄は▼から選択</div></a>' +
       printLink('#/print/answers', '解答・解説（管理者・講師用）', '全12回分の正解と解説') +
       '<a class="card month-card" href="docs/' + encodeURIComponent('確認テスト_解答一覧') + '.xlsx" download><b>解答Excel（採点表つき）</b><div class="muted small">正解一覧・解答解説・振り返りクイズ解答・自動採点表</div></a>' +
       '</div>';
