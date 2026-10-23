@@ -518,7 +518,7 @@
     var f1 = '<div class="paper"><h1>様式1　研修実施記録</h1><p>事業所名：</p><table>' +
       trow('研修名', '') + trow('区分', box(['法定研修（虐待防止・感染症・BCP）', '事業所研修', '新規採用時研修'], [])) +
       trow('実施日時', '令和　年　月　日（　）　　時　　分 〜 　　時　　分（　　分間）') + trow('実施場所・方法', box(PLACES, [])) +
-      trow('講師（職名）', '') + trow('参加者数', '　　名（様式2 参加者名簿のとおり）／対象者　　名') +
+      trow('講師', '') + trow('参加者数', '　　名（様式2 参加者名簿のとおり）／対象者　　名') +
       trow('使用資料', '□ 研修資料（　　月）　□ 確認テスト　□ その他：') + trow('研修内容の要旨', '<div style="height:5em"></div>') +
       trow('質疑・意見交換の内容', '<div style="height:4em"></div>') + trow('理解度確認の結果', '確認テスト平均　　点／満点　　点、要フォロー者　　名') +
       trow('欠席者への対応', '□ 資料回覧＋確認テスト　□ 伝達研修（　月　日）　□ その他：') + trow('今後の課題・次回への反映', '<div style="height:3em"></div>') +
@@ -837,7 +837,7 @@
       '<div><label>終了時刻</label><input type="time" name="end" value="' + esc(ss.end) + '"></div></div>' +
       (mins ? '<p class="muted small">研修時間：' + mins + '分間</p>' : '') +
       '<label>実施場所・方法</label>' + checks('place', PLACES, ss.place) +
-      '<label>講師（職名）</label><input type="text" name="instructorTitle" value="' + esc(ss.instructorTitle) + '">' +
+      '<label>講師</label><input type="text" name="instructorTitle" value="' + esc(ss.instructorTitle) + '">' +
       '<label>使用資料</label>' + checks('materials', ['研修資料', '確認テスト'], ss.materials) + '<input type="text" name="materialsOther" placeholder="その他の資料" value="' + esc(ss.materialsOther) + '">' +
       '<label>研修内容の要旨</label><textarea name="summary">' + esc(ss.summary) + '</textarea>' +
       '<label>質疑・意見交換の内容</label><textarea name="qa">' + esc(ss.qa) + '</textarea>' +
@@ -1303,7 +1303,7 @@
       trow('区分', box(['法定研修（虐待防止・感染症・BCP）', '事業所研修', '新規採用時研修'], [cat])) +
       trow('実施日時', esc(wa(ss.date)) + '　' + esc(ss.start) + ' 〜 ' + esc(ss.end) + (mins ? '（' + mins + '分間）' : '')) +
       trow('実施場所・方法', box(PLACES, ss.place)) +
-      trow('講師（職名）', esc(ss.instructorTitle)) +
+      trow('講師', esc(ss.instructorTitle)) +
       trow('参加者数', present.length + '名（様式2 参加者名簿のとおり）／対象者 ' + st.target + '名') +
       trow('使用資料', box(['研修資料', '確認テスト'], ss.materials).replace('研修資料', '研修資料（' + monthOf(key) + '）') + (ss.materialsOther ? '　その他：' + esc(ss.materialsOther) : '')) +
       trow('研修内容の要旨', esc(ss.summary), true) +
@@ -1501,7 +1501,7 @@
             } else {
               var n = mergeIn(x);
               save('データを取り込み：職員追加' + n.staff + '名・更新' + n.updated + '名、テスト' + n.results + '件' + (n.removed ? '、差し替えで削除' + n.removed + '件' : ''));
-              alert('取り込みました。職員 追加' + n.staff + '名・更新' + n.updated + '名、確認テスト ' + n.results + '件' + (n.removed ? '（差し替えで古い結果' + n.removed + '件を削除）' : '') + '、委員会・訓練 ' + n.meetings + '件。');
+              alert('取り込みました。職員 追加' + n.staff + '名・更新' + n.updated + '名、確認テスト ' + n.results + '件' + (n.removed ? '（差し替えで古い結果' + n.removed + '件を削除）' : '') + '、委員会・訓練 ' + n.meetings + '件' + (n.patched ? '、研修記録 ' + n.patched + '回分を更新' : '') + '。');
             }
             render();
           } catch (err) { alert('読み込めませんでした：' + err.message); }
@@ -1586,6 +1586,13 @@
           if (dst[f][id] === undefined) dst[f][id] = src[f][sid];
         });
       });
+    });
+    // 研修記録の項目をまとめて入れる（時間・講師など。指定された項目だけ上書き）
+    Object.keys(x.sessionPatch || {}).forEach(function (k) {
+      var dst = S.sessions[k];
+      if (!dst) return;
+      Object.keys(x.sessionPatch[k]).forEach(function (f) { dst[f] = x.sessionPatch[k][f]; });
+      n.patched = (n.patched || 0) + 1;
     });
     Object.keys(x.newHire || {}).forEach(function (sid) {
       var id = idMap[sid] || sid;
