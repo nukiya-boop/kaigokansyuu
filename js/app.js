@@ -50,7 +50,7 @@
     { qualification: '初任者研修', job: '訪問介護員', names: [
       { name: '吉田麻美', hireDate: '2026-02-01', retireDate: '' },
       { name: '生田友哉', hireDate: '2026-02-01', retireDate: '' },
-      { name: 'WIN YADANAR AWNG', hireDate: '2026-09-07', retireDate: '' },
+      { name: 'WIN YADANAR AWNG', hireDate: '2026-02-01', retireDate: '' },
       { name: '横山琴美', hireDate: '2026-02-01', retireDate: '2026-03-07', employment: '非常勤' },
       { name: '今田慶子', hireDate: '2026-02-01', retireDate: '2026-03-08' }
     ] }
