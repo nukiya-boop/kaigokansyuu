@@ -141,7 +141,7 @@ for b in NH['blocks']:
                 elif b['head'][j - 1] == '記入欄': c.fill = input_fill
             ws.row_dimensions[r].height = max(height(row[k], 18) for k in range(3))
             r += 1
-r += 1; line('受講記録（様式5「新規採用時研修記録」の項目2に転記）', 11, True, NAVY)
+r += 1; line('受講記録（様式5「新規採用時研修記録」に転記）', 11, True, NAVY)
 for k, v in [('氏名', ''), ('入職日', '令和　　年　　月　　日'), ('実施日', '令和　　年　　月　　日'), ('講師（職名）', ''),
              ('確認テストの点数', '　　点 ／ 10点'), ('本人署名', ''), ('管理者確認', '')]:
     a = ws.cell(r, 1, k); a.font = Font(size=10, bold=True); a.fill = head_fill; a.border = border; a.alignment = wrap

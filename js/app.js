@@ -14,16 +14,8 @@
   var EMPLOYMENTS = ['常勤', '非常勤', '登録ヘルパー'];
   var COMMITTEE_TYPES = ['虐待防止検討委員会', '感染対策委員会', '合同開催'];
   var DRILL_TYPES = ['BCP（自然災害）', 'BCP（感染症）', '感染症まん延防止訓練'];
-  var NEWHIRE_ITEMS = [
-    '法人理念・運営規程・就業規則、守秘義務誓約書の提出',
-    '高齢者虐待防止・身体的拘束等の適正化（必須）',
-    '感染症の予防及びまん延防止',
-    '業務継続計画（緊急連絡網・安否確認）',
-    'ハラスメント対策と相談窓口',
-    '記録の書き方・訪問介護計画と手順書の読み方',
-    '同行訪問',
-    '同行訪問'
-  ];
+  // 新規採用時研修は虐待防止のみ（以前の8項目の記録は legacyItems に残す）
+  var NEWHIRE_ITEMS = ['高齢者虐待防止・身体的拘束等の適正化（必須）'];
   // 事業所の職員名簿（資格別・在籍期間つき。雇用形態は指定がなければ常勤）。初回起動時に登録し、職員画面から不足分を追加できる
   // 事業開始日（令和8年2月1日）。この月から毎年度ずっと記録できる
   var OPEN_DATE = '2026-02-01';
@@ -115,6 +107,11 @@
     Object.keys(x.sessions || {}).forEach(function (k) { sessions[/^\d\d$/.test(k) ? fy + '-' + k : k] = x.sessions[k]; });
     x.sessions = sessions;
     (x.results || []).forEach(function (r) { if (!r.fy) r.fy = fy; });
+    // 新規採用時研修が8項目だった頃の記録は、虐待防止（2番目）だけを使う
+    Object.keys(x.newHire || {}).forEach(function (sid) {
+      var nh = x.newHire[sid];
+      if (nh && nh.items && nh.items.length > 1) { nh.legacyItems = nh.items; nh.items = [nh.items[1] || {}]; }
+    });
     x.version = 2;
     return x;
   }
@@ -983,7 +980,7 @@
           render();
         };
       });
-      return head + noStaffNotice() + '<div class="card"><p>全10問（○×5問、三択5問）、1問1点の10点満点です。目安は' + S.settings.passMark + '点以上です。結果は「新規採用時研修（様式5）」の虐待防止の項目に記録されます。紙の解答用紙の答えを入力して記録することもできます。</p>' +
+      return head + noStaffNotice() + '<div class="card"><p>全10問（○×5問、三択5問）、1問1点の10点満点です。目安は' + S.settings.passMark + '点以上です。結果は「新規採用時研修（様式5）」に記録されます。紙の解答用紙の答えを入力して記録することもできます。</p>' +
         '<form id="nhstart"><label>氏名</label><select name="staff"><option value="">選択してください</option>' +
         list.map(function (s) { return '<option value="' + s.id + '">' + esc(s.name) + (s.hireDate ? '（入職 ' + esc(wa(s.hireDate)) + '）' : '') + '</option>'; }).join('') + '</select>' +
         '<p id="prev" class="muted small"></p>' +
@@ -1008,7 +1005,7 @@
         var nh = S.newHire[NT.staffId] = S.newHire[NT.staffId] || { items: [] };
         nh.items = nh.items || [];
         nh.abuseTest = { date: NT.date, score: score, answers: NT.answers.slice(), takenAt: nowISO() };
-        var it = nh.items[1] = nh.items[1] || {};
+        var it = nh.items[0] = nh.items[0] || {};
         if (!it.date) it.date = NT.date;
         nh.updatedAt = nowISO();
         save('新規採用時研修（虐待防止）確認テスト：' + staffName(NT.staffId) + ' ' + score + '点');
@@ -1019,7 +1016,7 @@
     });
     var res = done ? '<div class="card" style="text-align:center"><div>' + esc(staffName(NT.staffId)) + 'さんの結果</div><div class="score">' + NT.score + ' / 10点</div>' +
       '<div>' + (nhPass(NT.score) ? '<span class="badge ok">合格ライン到達</span>' : '<span class="badge warn">もう一度資料を確認しましょう（管理者・講師から個別に説明します）</span>') + '</div>' +
-      '<p class="muted small">実施日：' + esc(wa(NT.date)) + '　様式5の虐待防止の項目に記録しました。</p>' +
+      '<p class="muted small">実施日：' + esc(wa(NT.date)) + '　様式5に記録しました。</p>' +
       '<div class="actions" style="justify-content:center"><button class="sub" id="again">別の職員が受ける</button><a class="btn sub" href="#/newhire/' + NT.staffId + '">様式5を見る</a><a class="btn sub" href="#/nh">研修資料を見直す</a></div></div>' : '';
     return head + '<p>氏名：<b>' + esc(staffName(NT.staffId)) + '</b>　実施日：' + esc(wa(NT.date)) + '</p>' + res +
       qs.map(function (q, i) {
@@ -1038,10 +1035,10 @@
     var list = S.staff.slice().sort(function (a, b) { return (b.hireDate || '') < (a.hireDate || '') ? -1 : 1; });
     return '<h1>新規採用時研修（様式5）</h1><p class="muted">虐待防止研修は新規採用時にも実施が必要です。採用者ごとに記録してください。</p>' + noStaffNotice() +
       '<div class="actions"><a class="btn" href="#/nh">虐待防止の研修資料・確認テスト</a><a class="btn sub" href="#/print/nh">研修資料を印刷</a><a class="btn sub" href="#/print/nhtest">問題用紙を印刷</a></div>' +
-      (list.length ? '<div class="table-wrap"><table><tr><th>氏名</th><th>入職日</th><th class="c">実施済項目</th><th>虐待防止 確認テスト</th><th>単独訪問開始日</th><th></th></tr>' + list.map(function (s) {
+      (list.length ? '<div class="table-wrap"><table><tr><th>氏名</th><th>入職日</th><th>虐待防止研修 実施日</th><th>虐待防止 確認テスト</th><th>単独訪問開始日</th><th></th></tr>' + list.map(function (s) {
         var nh = S.newHire[s.id] || { items: [] };
-        var n = (nh.items || []).filter(function (x) { return x && x.date; }).length;
-        return '<tr><td>' + esc(s.name) + (s.retireDate ? ' <span class="badge gray">退職</span>' : '') + '</td><td>' + esc(wa(s.hireDate)) + '</td><td class="c">' + n + ' / ' + NEWHIRE_ITEMS.length + (nh.items && nh.items[1] && nh.items[1].date ? '' : ' <span class="badge warn">虐待防止 未</span>') + '</td><td>' + (nh.abuseTest ? nh.abuseTest.score + '点（' + esc(wa(nh.abuseTest.date)) + '）' + (nhPass(nh.abuseTest.score) ? '' : ' <span class="badge warn">要フォロー</span>') : '<a href="#/nh/test">未受験</a>') + '</td><td>' + esc(wa(nh.soloStart)) + '</td><td><a href="#/newhire/' + s.id + '">記入</a>　<a href="#/print/newhire/' + s.id + '">印刷</a></td></tr>';
+        var done = nh.items && nh.items[0] && nh.items[0].date;
+        return '<tr><td>' + esc(s.name) + (s.retireDate ? ' <span class="badge gray">退職</span>' : '') + '</td><td>' + esc(wa(s.hireDate)) + '</td><td>' + (done ? esc(wa(done)) : '<span class="badge warn">未実施</span>') + '</td><td>' + (nh.abuseTest ? nh.abuseTest.score + '点（' + esc(wa(nh.abuseTest.date)) + '）' + (nhPass(nh.abuseTest.score) ? '' : ' <span class="badge warn">要フォロー</span>') : '<a href="#/nh/test">未受験</a>') + '</td><td>' + esc(wa(nh.soloStart)) + '</td><td><a href="#/newhire/' + s.id + '">記入</a>　<a href="#/print/newhire/' + s.id + '">印刷</a></td></tr>';
       }).join('') + '</table></div>' : '');
   });
   route(/^\/newhire\/(\w+)$/, function (id) {
@@ -1053,7 +1050,7 @@
       f.onsubmit = function (e) {
         e.preventDefault();
         var d = formData(f);
-        var o = { items: NEWHIRE_ITEMS.map(function (_, i) { return { date: d['d' + i], instructor: d['t' + i], client: d['c' + i] || '' }; }), soloStart: d.soloStart, sekiCheck: d.sekiCheck, managerCheck: d.managerCheck, abuseTest: nh.abuseTest, updatedAt: nowISO() };
+        var o = { items: NEWHIRE_ITEMS.map(function (_, i) { return { date: d['d' + i], instructor: d['t' + i], client: '' }; }), legacyItems: nh.legacyItems, soloStart: d.soloStart, sekiCheck: d.sekiCheck, managerCheck: d.managerCheck, abuseTest: nh.abuseTest, updatedAt: nowISO() };
         S.newHire[id] = o;
         save('新規採用時研修記録を更新：' + s.name);
         toast('保存しました'); go('/newhire');
@@ -1065,7 +1062,7 @@
       '<form id="nh" class="card"><div class="table-wrap"><table><tr><th>No.</th><th>研修内容</th><th>実施日</th><th>講師</th></tr>' +
       NEWHIRE_ITEMS.map(function (t, i) {
         var it = (nh.items || [])[i] || {};
-        return '<tr><td>' + (i + 1) + '</td><td>' + esc(t) + (i >= 6 ? '<input type="text" name="c' + i + '" placeholder="利用者名" value="' + esc(it.client || '') + '">' : '') + '</td>' +
+        return '<tr><td>' + (i + 1) + '</td><td>' + esc(t) + '' + '</td>' +
           '<td><input type="date" name="d' + i + '" value="' + esc(it.date || '') + '"></td><td><input type="text" name="t' + i + '" value="' + esc(it.instructor || '') + '"></td></tr>';
       }).join('') + '</table></div>' +
       '<div class="row"><div><label>単独訪問の開始日</label><input type="date" name="soloStart" value="' + esc(nh.soloStart || '') + '"></div>' +
@@ -1201,7 +1198,7 @@
     push({ name: 'BCP訓練 自然災害（年1回以上）', ok: dN.length > 0, detail: dN.length ? dN.map(function (r) { return wa(r.date); }).join('、') : '記録なし（計画：7月）', due: past('07') }, ['07']);
     push({ name: 'BCP訓練 感染症（年1回以上）', ok: dC.length > 0, detail: dC.length ? dC.map(function (r) { return wa(r.date); }).join('、') : '記録なし（計画：11月）', due: past('11') }, ['11']);
     var hires = S.staff.filter(function (s) { return inFY(s.hireDate); });
-    var nhNg = hires.filter(function (s) { var nh = S.newHire[s.id]; return !(nh && nh.items && nh.items[1] && nh.items[1].date); });
+    var nhNg = hires.filter(function (s) { var nh = S.newHire[s.id]; return !(nh && nh.items && nh.items[0] && nh.items[0].date); });
     out.push({ name: '新規採用時の虐待防止研修', ok: !nhNg.length, detail: hires.length ? (nhNg.length ? '未記録：' + nhNg.map(function (s) { return s.name; }).join('、') : '今年度採用' + hires.length + '名すべて実施済み') : '今年度の新規採用者なし', due: true });
     // 記録の不備
     var gaps = [];
@@ -1425,7 +1422,7 @@
       '<table class="list"><tr><th class="c">No.</th><th>研修内容</th><th>実施日</th><th>講師</th><th style="width:18%">本人署名</th></tr>' +
       NEWHIRE_ITEMS.map(function (t, i) {
         var it = (nh.items || [])[i] || {};
-        return '<tr class="sign"><td class="c">' + (i + 1) + '</td><td>' + esc(t) + (i >= 6 ? '（利用者名：' + esc(it.client || '') + '）' : '') + '</td><td>' + esc(wa(it.date)) + '</td><td>' + esc(it.instructor || '') + '</td><td></td></tr>';
+        return '<tr class="sign"><td class="c">' + (i + 1) + '</td><td>' + esc(t) + '' + '</td><td>' + esc(wa(it.date)) + '</td><td>' + esc(it.instructor || '') + '</td><td></td></tr>';
       }).join('') + '</table><br><table>' +
       trow('虐待防止の確認テスト', nh.abuseTest ? nh.abuseTest.score + '点 ／ 10点（' + esc(wa(nh.abuseTest.date)) + '）' : '') + trow('単独訪問の開始日', esc(wa(nh.soloStart))) + trow('サービス提供責任者確認', esc(nh.sekiCheck || '')) + trow('管理者確認', esc(nh.managerCheck || '')) + '</table></div>';
   }
