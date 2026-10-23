@@ -307,7 +307,11 @@
     var h = location.hash.replace(/^#/, '') || '/';
     document.getElementById('office-name').textContent = S.settings.office || '事業所名未設定';
     var fs = document.getElementById('fy-select'), cy = fyOf(today());
-    var y0 = Math.min(S.settings.openDate ? fyOf(S.settings.openDate) : cy, S.settings.startYear), y1 = Math.max(cy + 1, S.settings.startYear), opts = '';
+    // 事業開始日の年度から。記録が残っている年度も必ず選べるようにする
+    var y0 = Math.min(S.settings.openDate ? fyOf(S.settings.openDate) : cy, S.settings.startYear);
+    S.results.forEach(function (r) { if (r.fy < y0) y0 = r.fy; });
+    Object.keys(S.sessions).forEach(function (k) { var y = +k.slice(0, 4); if (y < y0) y0 = y; });
+    var y1 = Math.max(cy + 1, S.settings.startYear), opts = '';
     for (var y = y1; y >= y0; y--) opts += '<option value="' + y + '"' + (y === S.settings.startYear ? ' selected' : '') + '>' + reiwa(y) + '</option>';
     fs.innerHTML = opts;
     document.getElementById('nav').classList.remove('open');
