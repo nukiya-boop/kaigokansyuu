@@ -427,7 +427,7 @@
       '<div class="material card"><h1>' + esc(m.title) + legalBadge(m) + '</h1>' +
       '<p class="muted">講師：' + esc(m.instructor) + '　区分：' + esc(m.category) + '</p>' +
       (m.aim ? '<div class="aim"><b>ねらい：</b>' + esc(m.aim) + '</div>' : '') + body + review + refs +
-      '<div class="actions"><a class="btn" href="#/test/' + key + '">確認テストを受ける</a><a class="btn sub" href="#/grade/' + key + '">紙の解答を採点</a><a class="btn sub" href="#/print/material/' + key + '">研修資料を印刷</a><a class="btn sub" href="#/print/test/' + key + '">問題用紙を印刷</a><a class="btn sub" href="#/record/' + key + '">実施記録</a></div></div>';
+      '<div class="actions"><a class="btn" href="#/test/' + key + '">確認テストを受ける</a><a class="btn sub" href="#/grade/' + key + '">紙の解答を採点</a><a class="btn sub" href="#/print/material/' + key + '">研修資料を印刷</a><a class="btn sub" href="#/print/test/' + key + '">問題用紙を印刷</a><a class="btn sub" href="#/print/sheet/' + key + '/blank">解答用紙を印刷</a><a class="btn sub" href="#/record/' + key + '">実施記録</a></div></div>';
   });
 
   // ---------- 資料集（Excelの資料） ----------
@@ -447,6 +447,8 @@
       '</div>' +
       '<h2>確認テスト集</h2><div class="grid">' +
       printLink('#/print/tests', '問題用紙（12か月分）', '解答なし。紙で実施する場合・欠席者への配布用') +
+      printLink('#/print/sheets/blank', '解答用紙を印刷（白紙・12か月分）', '氏名・実施日・受験の種類・解答欄つき') +
+      printLink('#/print/sheets', '解答用紙を印刷（受験した人の解答入り）', '表示中の年度に受験した全員分。1人1枚') +
       '<a class="card month-card" href="docs/' + encodeURIComponent('確認テスト_解答用紙') + '.xlsx" download><b>解答用紙Excel（12か月分）</b><div class="muted small">印刷して手書き、またはExcelに入力して提出。解答欄は▼から選択</div></a>' +
       printLink('#/print/answers', '解答・解説（管理者・講師用）', '全12回分の正解と解説') +
       '<a class="card month-card" href="docs/' + encodeURIComponent('確認テスト_解答一覧') + '.xlsx" download><b>解答Excel（採点表つき）</b><div class="muted small">正解一覧・解答解説・振り返りクイズ解答・自動採点表</div></a>' +
@@ -847,7 +849,7 @@
       '<p class="muted small">理解度確認の結果（自動集計）：確認テスト平均 ' + (st.avg === '' ? '—' : st.avg) + '点／10点、受験 ' + st.scored + '名、要フォロー ' + st.follow.length + '名' + (st.follow.length ? '（' + esc(st.follow.join('、')) + '）' : '') + '</p></div>' +
       '<div class="card"><h3>様式2　参加者名簿・欠席者回覧確認</h3>' +
       '<p class="muted small">対象者は実施日に在籍している職員です。アプリで受けた確認テストの点数は自動で入ります。紙で受けた場合は点数を入力してください。</p>' +
-      '<div class="actions"><button type="button" class="sub" id="allpresent">未記録をすべて「参加」にする</button><a class="btn sub" href="#/grade/' + key + '">紙の解答を入力して自動採点</a></div>' +
+      '<div class="actions"><button type="button" class="sub" id="allpresent">未記録をすべて「参加」にする</button><a class="btn sub" href="#/grade/' + key + '">紙の解答を入力して自動採点</a><a class="btn sub" href="#/print/sheet/' + key + '">解答用紙を印刷（受験した人の解答入り）</a></div>' +
       '<div class="table-wrap"><table><tr><th>氏名</th><th>出欠</th><th>確認テスト</th><th>資料受領日<br><span class="small">（欠席者）</span></th><th>テスト提出日<br><span class="small">（欠席者）</span></th><th>管理者確認日<br><span class="small">（欠席者）</span></th></tr>' + rows + '</table></div></div>' +
       '<div class="actions"><button type="submit">保存する</button></div></form>' +
       (ss.updatedAt ? '<p class="muted small">最終更新：' + waDateTime(ss.updatedAt) + '</p>' : '');
@@ -946,6 +948,8 @@
       printLink('#/nh', '研修資料・確認テスト', '入職時に必ず行う虐待防止研修。アプリで読んでテストを受けると様式5に記録されます') +
       printLink('#/print/nh', '研修資料を印刷', '解答なし（配布用）。解答つき（講師用）にも切り替えられます') +
       printLink('#/print/nhtest', '問題用紙を印刷', '紙で受ける場合') +
+      printLink('#/print/nhsheet/blank', '解答用紙を印刷（白紙）', '氏名・入職日・実施日・解答欄つき') +
+      printLink('#/print/nhsheet', '解答用紙を印刷（受験した人の解答入り）', '確認テストを受けた全員分。1人1枚') +
       '<a class="card month-card" href="docs/' + encodeURIComponent('新規採用時研修_虐待防止') + '.xlsx" download><b>Excel（研修資料・解答用紙・解答解説）</b><div class="muted small">解答用紙は▼から選択して入力もできます</div></a>' +
       '</div>';
   }
@@ -956,7 +960,7 @@
       '<div class="material card"><h1>' + esc(NH.title) + ' <span class="badge warn">必須</span></h1>' +
       '<div class="aim"><b>ねらい：</b>' + esc(NH.aim) + '</div>' + materialBody(NH) +
       '<h2>参考資料（公的機関）</h2>' + refsList(NH.refs) +
-      '<div class="actions"><a class="btn" href="#/nh/test">確認テストを受ける</a><a class="btn sub" href="#/print/nh">研修資料を印刷</a><a class="btn sub" href="#/print/nhtest">問題用紙を印刷</a>' +
+      '<div class="actions"><a class="btn" href="#/nh/test">確認テストを受ける</a><a class="btn sub" href="#/print/nh">研修資料を印刷</a><a class="btn sub" href="#/print/nhtest">問題用紙を印刷</a><a class="btn sub" href="#/print/nhsheet/blank">解答用紙を印刷</a>' +
       '<a class="btn sub" href="docs/' + encodeURIComponent('新規採用時研修_虐待防止') + '.xlsx" download>解答用紙Excel</a></div></div>';
   });
   var NT = null; // 新規採用時の確認テストの途中経過
@@ -1034,7 +1038,7 @@
   route(/^\/newhire$/, function () {
     var list = S.staff.slice().sort(function (a, b) { return (b.hireDate || '') < (a.hireDate || '') ? -1 : 1; });
     return '<h1>新規採用時研修（様式5）</h1><p class="muted">虐待防止研修は新規採用時にも実施が必要です。採用者ごとに記録してください。</p>' + noStaffNotice() +
-      '<div class="actions"><a class="btn" href="#/nh">虐待防止の研修資料・確認テスト</a><a class="btn sub" href="#/print/nh">研修資料を印刷</a><a class="btn sub" href="#/print/nhtest">問題用紙を印刷</a></div>' +
+      '<div class="actions"><a class="btn" href="#/nh">虐待防止の研修資料・確認テスト</a><a class="btn sub" href="#/print/nh">研修資料を印刷</a><a class="btn sub" href="#/print/nhtest">問題用紙を印刷</a><a class="btn sub" href="#/print/nhsheet">解答用紙を印刷</a></div>' +
       (list.length ? '<div class="table-wrap"><table><tr><th>氏名</th><th>入職日</th><th>虐待防止研修 実施日</th><th>虐待防止 確認テスト</th><th>単独訪問開始日</th><th></th></tr>' + list.map(function (s) {
         var nh = S.newHire[s.id] || { items: [] };
         var done = nh.items && nh.items[0] && nh.items[0].date;
@@ -1240,6 +1244,8 @@
       printLink('#/print/meetings', '様式3・4　委員会議事録・訓練記録（全件）', '今年度の議事録・訓練記録') +
       printLink('#/print/newhires', '様式5　新規採用時研修記録（全員）', '今年度に入職した職員の記録') +
       printLink('#/print/tests', '確認テスト 問題用紙（12か月分）', '紙で実施する場合・欠席者への配布用') +
+      printLink('#/print/sheets', '確認テスト 解答用紙（受験した全員分）', '1人1枚。実施日・点数・解答入り') +
+      printLink('#/print/nhsheet', '新規採用時研修 解答用紙（受験した全員分）', '虐待防止の確認テスト。1人1枚') +
       printLink('#/print/answers', '確認テスト 解答・解説', '管理者・講師用') +
       printLink('#/print/log', '更新履歴', 'いつ・何を記録したかの履歴') +
       '</div>' +
@@ -1443,6 +1449,52 @@
       '<p>問1〜問5　正しいものに○、誤っているものに×を解答欄に書いてください。</p><table class="list"><tr><th class="c">問</th><th>問題</th><th>解答欄</th></tr>' + m.test.slice(0, 5).map(row).join('') + '</table>' +
       '<p>問6〜問10　正しいもの（または問われているもの）を、ア・イ・ウから1つ選んで解答欄に書いてください。</p><table class="list"><tr><th class="c">問</th><th>問題</th><th>解答欄</th></tr>' + m.test.slice(5).map(row).join('') + '</table></div>';
   }
+  // 解答用紙（白紙、または受験した人の解答を入れたもの）
+  function paperSheet(m, name, info) {
+    info = info || {};
+    var ans = info.answers || [];
+    var row = function (q, i) {
+      var t = esc(q.q) + (q.choices.length ? '<br>' + q.choices.map(function (c) { return '　' + c.k + '　' + esc(c.t); }).join('<br>') : '');
+      return '<tr><td class="c">' + q.no + '</td><td>' + t + '</td><td class="c" style="width:14%;font-size:1.4em;font-weight:bold">' + esc(ans[i] || '') + '</td></tr>';
+    };
+    var head = '<tr><th class="c">問</th><th>問題</th><th class="c">解答欄</th></tr>';
+    return '<div class="paper"><h1>確認テスト 解答用紙　' + esc(name) + '</h1>' +
+      '<table>' + trow('実施日', info.date ? esc(wa(info.date)) : '令和　　年　　月　　日') + trow('氏名', esc(info.staff || '')) +
+      (m === NH ? trow('入職日', info.hire ? esc(wa(info.hire)) : '令和　　年　　月　　日') : trow('受験の種類', info.kind ? esc(info.kind) : '研修に参加 ／ 欠席（資料回覧）　※どちらかに○')) +
+      trow('点数', info.score !== undefined ? info.score + '点 ／ 10点' : '　　　点 ／ 10点（採点者記入）') + '</table>' +
+      '<p>問1〜問5　正しいものに○、誤っているものに×を解答欄に書いてください。</p><table class="list">' + head + m.test.slice(0, 5).map(function (q, i) { return row(q, i); }).join('') + '</table>' +
+      '<p>問6〜問10　正しいもの（または問われているもの）を、ア・イ・ウから1つ選んで解答欄に書いてください。</p><table class="list">' + head + m.test.slice(5).map(function (q, i) { return row(q, i + 5); }).join('') + '</table></div>';
+  }
+  function monthSheets(key, blank) {
+    var m = BY_KEY[key], name = m.month + '　' + m.theme;
+    var rs = blank ? [] : S.results.filter(function (r) { return r.month === key && r.fy === S.settings.startYear && r.kind !== '練習' && staffById(r.staffId); });
+    var order = S.staff.map(function (x) { return x.id; });
+    rs.sort(function (a, b) { return order.indexOf(a.staffId) - order.indexOf(b.staffId) || (a.takenAt < b.takenAt ? -1 : 1); });
+    if (!rs.length) return paperSheet(m, name);
+    return rs.map(function (r) {
+      return paperSheet(m, name, { date: r.takenAt.slice(0, 10), staff: staffName(r.staffId), kind: r.kind === '回覧' ? '欠席（資料回覧）' : '研修に参加', score: r.score, answers: r.answers });
+    }).join('');
+  }
+  function sheetToggle(filledHref, blankHref, blank) {
+    return '<div class="actions no-print"><a class="btn sub" href="' + (blank ? filledHref : blankHref) + '">' + (blank ? '受験した人の解答を入れて印刷' : '白紙で印刷（配布用）') + '</a></div>';
+  }
+  route(/^\/print\/sheet\/(\d\d)(\/blank)?$/, function (key, blank) {
+    return paperShell('解答用紙', sheetToggle('#/print/sheet/' + key, '#/print/sheet/' + key + '/blank', !!blank) + monthSheets(key, !!blank));
+  });
+  route(/^\/print\/sheets(\/blank)?$/, function (blank) {
+    return paperShell('解答用紙（' + (blank ? '白紙・12か月分' : reiwa(S.settings.startYear) + '・受験した全員分') + '）', sheetToggle('#/print/sheets', '#/print/sheets/blank', !!blank) +
+      (blank ? MONTHS : activeMonths().filter(function (m) { return S.results.some(function (r) { return r.month === m.key && r.fy === S.settings.startYear && r.kind !== '練習'; }); }))
+        .map(function (m) { return monthSheets(m.key, !!blank); }).join('') || '<p>表示中の年度に受験した記録がありません。</p>');
+  });
+  route(/^\/print\/nhsheet(\/blank)?$/, function (blank) {
+    var name = '新規採用時研修　' + NH.theme;
+    var list = blank ? [] : S.staff.filter(function (x) { return S.newHire[x.id] && S.newHire[x.id].abuseTest; });
+    return paperShell('解答用紙（新規採用時研修）', sheetToggle('#/print/nhsheet', '#/print/nhsheet/blank', !!blank) +
+      (list.length ? list.map(function (x) {
+        var t = S.newHire[x.id].abuseTest;
+        return paperSheet(NH, name, { date: t.date, staff: x.name, hire: x.hireDate, score: t.score, answers: t.answers });
+      }).join('') : paperSheet(NH, name)));
+  });
   route(/^\/print\/test\/(\d\d)$/, function (key) { return paperShell('問題用紙', paperTest(key)); });
   route(/^\/print\/tests$/, function () { return paperShell('問題用紙（12か月分）', MONTHS.map(function (m) { return paperTest(m.key); }).join('')); });
   function answersPaper(m, name) {
