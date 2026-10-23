@@ -9,7 +9,7 @@
   var STORE_KEY = 'kaigoTraining.v1';
   var STATUSES = ['予定', '実施済', '延期', '中止'];
   var PLACES = ['事業所内', 'オンライン', '外部研修', '資料回覧'];
-  var JOBS = ['訪問介護員', 'サービス提供責任者', '管理者', '事務員', 'その他'];
+  var JOBS = ['従業員', '訪問介護員', 'サービス提供責任者', '管理者', '事務員', 'その他'];
   var EMPLOYMENTS = ['常勤', '非常勤', '登録ヘルパー'];
   var COMMITTEE_TYPES = ['虐待防止検討委員会', '感染対策委員会', '合同開催'];
   var DRILL_TYPES = ['BCP（自然災害）', 'BCP（感染症）', '感染症まん延防止訓練'];
@@ -1270,8 +1270,8 @@
               S = load(); save('バックアップから復元（置き換え）');
             } else {
               var n = mergeIn(x);
-              save('別端末のデータを取り込み：職員' + n.staff + '名、テスト' + n.results + '件');
-              alert('取り込みました。職員 ' + n.staff + '名、確認テスト ' + n.results + '件、委員会・訓練 ' + n.meetings + '件を追加しました。');
+              save('データを取り込み：職員追加' + n.staff + '名・更新' + n.updated + '名、テスト' + n.results + '件');
+              alert('取り込みました。職員 追加' + n.staff + '名・更新' + n.updated + '名、確認テスト ' + n.results + '件、委員会・訓練 ' + n.meetings + '件。');
             }
             render();
           } catch (err) { alert('読み込めませんでした：' + err.message); }
@@ -1303,11 +1303,20 @@
 
   // 別端末のデータを取り込む（IDが同じものは上書きしない。職員は氏名でも照合）
   function mergeIn(x) {
-    var n = { staff: 0, results: 0, meetings: 0 };
+    var n = { staff: 0, updated: 0, results: 0, meetings: 0 };
     var idMap = {};
     (x.staff || []).forEach(function (s) {
       var same = staffById(s.id) || S.staff.filter(function (t) { return t.name === s.name; })[0];
-      if (same) { idMap[s.id] = same.id; return; }
+      if (same) {
+        idMap[s.id] = same.id;
+        // 職員名簿の取り込みファイルは入力された項目で上書き、通常のバックアップは空欄だけ補う
+        var changed = false;
+        ['job', 'employment', 'hireDate', 'qualification', 'retireDate'].forEach(function (k) {
+          if (s[k] && s[k] !== same[k] && (x.importOnly || !same[k])) { same[k] = s[k]; changed = true; }
+        });
+        if (changed) n.updated++;
+        return;
+      }
       S.staff.push(s); idMap[s.id] = s.id; n.staff++;
     });
     var have = {};
