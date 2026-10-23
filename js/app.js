@@ -918,7 +918,7 @@
       '<div><label>資格</label><input type="text" name="qualification" placeholder="介護福祉士、初任者研修 など"></div></div>' +
       '<div class="actions"><button type="submit">登録</button></div></form>' +
       (list.length ? '<div class="table-wrap"><table><tr><th>氏名</th><th>職種・雇用形態</th><th>入職日</th><th>資格</th><th>退職日</th><th></th></tr>' + list.map(function (s) {
-        return '<tr><td>' + esc(s.name) + '</td><td>' + esc(s.job) + '・' + esc(s.employment) + '</td><td>' + esc(wa(s.hireDate)) + '</td><td>' + esc(s.qualification) + '</td><td>' + esc(wa(s.retireDate)) + '</td>' +
+        return '<tr><td>' + esc(s.name) + '</td><td>' + esc([s.job, s.employment].filter(Boolean).join('・') || '未設定') + '</td><td>' + esc(wa(s.hireDate)) + '</td><td>' + esc(s.qualification) + '</td><td>' + esc(wa(s.retireDate)) + '</td>' +
           '<td><a href="#/staff/' + s.id + '">編集</a>　<a href="#/print/person/' + s.id + '">受講履歴</a></td></tr>';
       }).join('') + '</table></div>' : '');
   });
@@ -1156,7 +1156,7 @@
     if (!s) return '<p>職員が見つかりません。</p>';
     var rs = S.results.filter(function (r) { return r.staffId === id; }).sort(function (a, b) { return a.takenAt < b.takenAt ? -1 : 1; });
     return paperShell('個人別受講履歴', '<div class="paper"><h1>研修受講履歴　' + esc(s.name) + '</h1>' + officeLine() +
-      '<p>職種：' + esc(s.job) + '・' + esc(s.employment) + '　入職日：' + esc(wa(s.hireDate)) + '　資格：' + esc(s.qualification) + '</p>' +
+      '<p>職種：' + esc([s.job, s.employment].filter(Boolean).join('・') || '未設定') + '　入職日：' + esc(wa(s.hireDate)) + '　資格：' + esc(s.qualification) + '</p>' +
       '<table class="list"><tr><th>月</th><th>研修テーマ</th><th>実施日</th><th>受講</th><th class="c">確認テスト</th></tr>' + MONTHS.map(function (m) {
         var sc = scoreOf(id, m.key);
         return '<tr><td>' + esc(m.month) + '</td><td>' + (m.legal ? '★' : '') + esc(m.theme) + '</td><td>' + esc(wa(sessionView(m.key).date)) + '</td><td>' + esc(completion(id, m.key)) + '</td><td class="c">' + (sc ? sc.score + '点' : '') + '</td></tr>';
